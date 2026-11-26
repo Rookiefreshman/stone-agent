@@ -1,5 +1,5 @@
-v0.9.7 verified CI results (2026-11-26)
-Initial Agent run 45766133202: failed at Python test collection due to malformed generated regex source; fixed in 5596372.
-Agent 5596372d5af0f96f1de6c91df0538cdd00398361: run 45766300805, 346 passed, 1 warning in 52.42s; 21 additional cases (fixture grammar, simulated provider, session/API and safety boundaries).
-Stone af0f02e4e34df2be46d542cc7c4b9f4ea66fe753: run 45766336138, MySQL 5.7/8.0 each 45 Java tests, zero failures/errors/skips; nine actual HTTP groups each. Managed natural language fixture proposal, explicit typed confirmation and real read-only execution for all three goals; no execution model attempts; business_posts=0.
-No real external LLM or production identity, write dispatch or production acceptance tested. Final documentation commit CI tracked separately.
+v0.9.8 verified CI (2026-11-26)
+Previous v0.9.7 final Agent 45766629055 and 45766574348 success; Stone 45766622682 and 45766603683 success. Default main contains only README, not full engineering branch.
+Agent ca43db42aa224af786d78b55bb8e52bd75071998: run 45767119437, 357 passed, 1 warning in 49.18s; 11 new tests. Dependency validation, PostgreSQL migrations/regression, fixture gate and artifact upload succeeded.
+Synthetic fixture gold v1: 44 cases, 33 exact (75%); confirmable goal and entity accuracy each 10/20 (50%); unsupported 13/13, clarification 7/8, authorization 3/3; zero false/wrong confirmation, zero model requests. 11 coverage misses, not a live LLM score. P50/P95 0.013/0.028ms local rule latency, no model tokens reported. Artifact semantic-fixture-baseline.
+No external model configuration supplied; live evaluation, customer-reviewed corpus, actual deployment and production authorization not verified. No Stone changes, no schema change, no business execution. Final documentation commit CI tracked separately.
