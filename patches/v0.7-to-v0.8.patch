@@ -1,0 +1,182 @@
+--- a/agent/contracts.py
++++ b/agent/contracts.py
+@@ -4,6 +4,7 @@
+ from typing import Literal
+ from pydantic import BaseModel, ConfigDict, Field, model_validator
+ from .integrations.outbound import OutboundArgs
++from .integrations.wes import WesArgs
+ 
+ 
+ def canonical(obj):
+@@ -74,8 +75,8 @@
+ 
+ class GoalContract(BaseModel):
+     model_config = ConfigDict(extra='forbid', strict=True)
+-    kind: Literal['READ_STOCK_WORK', 'DIAGNOSE_STOCK_WORK', 'ANALYZE_STOCK_WORK', 'COMPARE_STOCK_WORK', 'DEEP_DIAGNOSE_STOCK_WORK', 'DIAGNOSE_OUTBOUND_ALLOCATION', 'CLARIFY', 'UNSUPPORTED']
+-    entity: StockWorkArgs | OutboundArgs | None = None
++    kind: Literal['READ_STOCK_WORK', 'DIAGNOSE_STOCK_WORK', 'ANALYZE_STOCK_WORK', 'COMPARE_STOCK_WORK', 'DEEP_DIAGNOSE_STOCK_WORK', 'DIAGNOSE_OUTBOUND_ALLOCATION', 'DIAGNOSE_WES_DISPATCH', 'CLARIFY', 'UNSUPPORTED']
++    entity: StockWorkArgs | OutboundArgs | WesArgs | None = None
+     entities: list[StockWorkArgs] = Field(default_factory=list,max_length=3)
+     missing_fields: list[str] = Field(default_factory=list)
+     unresolved_items: list[str] = Field(default_factory=list)
+@@ -83,6 +84,10 @@
+ 
+     @model_validator(mode='after')
+     def validate_goal(self):
++        if self.kind=='DIAGNOSE_WES_DISPATCH':
++            if not isinstance(self.entity,WesArgs) or self.entities or self.missing_fields or self.unresolved_items:
++                raise ValueError('dispatch diagnosis requires confirmed warehouse, device and limit')
++        elif isinstance(self.entity,WesArgs): raise ValueError('dispatch entity requires dispatch goal')
+         if self.kind=='DIAGNOSE_OUTBOUND_ALLOCATION':
+             if not isinstance(self.entity,OutboundArgs) or self.entities or self.missing_fields or self.unresolved_items:
+                 raise ValueError('outbound diagnosis requires confirmed order')
+--- a/agent/tools.py
++++ b/agent/tools.py
+@@ -3,6 +3,7 @@
+ from typing import Callable
+ import json, urllib.request, urllib.parse, urllib.error
+ from .integrations.outbound import OutboundArgs, OutboundResult, fixture as outbound_fixture
++from .integrations.wes import WesArgs, WesResult, fixture as wes_fixture
+ from .contracts import StockWorkArgs, StockWorkResult, StockWorkDiagnosis, StockWorkLedgerSummary, DispatchHistory, Task, Work, LedgerEntry, Principal, Forbidden, ProposalError, DomainReadError, strict_json, digest
+ 
+ @dataclass(frozen=True)
+@@ -87,6 +88,30 @@
+         if not isinstance(body,dict) or body.get('success') is not True: raise DomainReadError('UPSTREAM_BUSINESS_ERROR')
+         return project(args,body.get('data'),'STONE_HTTP')
+ 
++    def get_wes_dispatch(self,principal,args):
++        authorize(principal,args)
++        if not self.token: raise DomainReadError('WES_SERVICE_TOKEN_REQUIRED')
++        query=urllib.parse.urlencode({'deviceCode':args.device_code})
++        url=f'{self.base}/api/wes/warehouses/{args.warehouse_id}/dispatch-diagnostic?{query}'
++        try:
++            request=urllib.request.Request(url,headers={'Accept':'application/json','Authorization':'Bearer '+self.token},method='GET')
++            with self.opener.open(request,timeout=self.timeout) as response:
++                raw=response.read(1_000_001)
++            if len(raw)>1_000_000: raise DomainReadError('UPSTREAM_RESPONSE_TOO_LARGE')
++            body=strict_json(raw.decode('utf-8'))
++        except urllib.error.HTTPError as exc:
++            if exc.code==404:
++                try: body=strict_json(exc.read(16385).decode('utf-8'))
++                except (ValueError,UnicodeError): body=None
++                if body=={'success':False,'message':'DISPATCH_SCOPE_NOT_FOUND','data':None}:
++                    return WesResult(**args.model_dump(),status='NOT_FOUND',snapshot=None,source='STONE_HTTP',observed_at=observed()).model_dump()
++            raise DomainReadError('WES_HTTP_'+str(exc.code)) from exc
++        except (OSError,ValueError,UnicodeError) as exc: raise DomainReadError('WES_TRANSPORT_OR_JSON_ERROR') from exc
++        if not isinstance(body,dict) or body.get('success') is not True: raise DomainReadError('WES_BUSINESS_ERROR')
++        try:
++            return WesResult(**args.model_dump(),status='FOUND',snapshot=body['data'],source='STONE_HTTP',observed_at=observed()).model_dump()
++        except (KeyError,TypeError,ValueError) as exc: raise DomainReadError('WES_CONTRACT_ERROR') from exc
++
+     def get_outbound(self,principal,args):
+         authorize(principal,args)
+         if not self.token: raise DomainReadError('OUTBOUND_SERVICE_TOKEN_REQUIRED')
+@@ -132,6 +157,9 @@
+         except (KeyError,TypeError,ValueError) as exc: raise DomainReadError('EVENT_HISTORY_CONTRACT_ERROR') from exc
+ 
+ class FixtureStoneService:
++    def get_wes_dispatch(self,principal,args):
++        authorize(principal,args); self.calls+=1
++        return wes_fixture(args,observed()).model_dump()
+     def get_outbound(self,principal,args):
+         authorize(principal,args); self.calls+=1
+         return outbound_fixture(args,observed()).model_dump()
+@@ -161,6 +189,8 @@
+         specs.append(ToolSpec('get_stock_work_events','stone.wes.stock_work.events',1,service.revision+':events-v1',service.get_events,'只读查询指定仓库库存作业的历史设备回执及核对记录。'))
+     if hasattr(service,'get_outbound'):
+         specs.append(ToolSpec('get_outbound_allocation_snapshot','stone.wms.outbound.allocation_snapshot',1,service.revision+':outbound-v1',service.get_outbound,'只读出库单及指定库存维度、库位冻结和分配回执存在状态。',OutboundArgs))
++    if hasattr(service,'get_wes_dispatch'):
++        specs.append(ToolSpec('get_wes_dispatch_snapshot','stone.wes.dispatch.snapshot',1,service.revision+':wes-dispatch-v1',service.get_wes_dispatch,'只读查询指定仓库及设备的调度容量和任务数量，不领取任务。',WesArgs))
+     return Registry(specs)
+ 
+ def explain(result):
+--- a/agent/runtime.py
++++ b/agent/runtime.py
+@@ -24,7 +24,7 @@
+             return done('FAILED',code)
+         try:
+             if mode not in (RULES,LEGACY): return done('FAILED','EXECUTION_MODE_INVALID')
+-            if goal.kind in ('DEEP_DIAGNOSE_STOCK_WORK','DIAGNOSE_OUTBOUND_ALLOCATION') and not rule_mode: return done('FAILED','RULE_MODE_REQUIRED')
++            if goal.kind in ('DEEP_DIAGNOSE_STOCK_WORK','DIAGNOSE_OUTBOUND_ALLOCATION','DIAGNOSE_WES_DISPATCH') and not rule_mode: return done('FAILED','RULE_MODE_REQUIRED')
+             if row['cancelled']: return done('CANCELLED','CANCELLED')
+             if goal.kind=='CLARIFY': return done('NEEDS_INPUT','MISSING_FIELDS',missing_fields=goal.missing_fields)
+             if goal.kind=='UNSUPPORTED': return done('FAILED','UNSUPPORTED_GOAL',unresolved_items=goal.unresolved_items)
+--- a/agent/integrations/stock_work.py
++++ b/agent/integrations/stock_work.py
+@@ -2,6 +2,8 @@
+ from ..contracts import StockWorkResult, StockWorkDiagnosis, StockWorkLedgerSummary, DispatchHistory, digest
+ from ..tools import explain, diagnose, summarize_ledger
+ from .outbound import OutboundResult, analyze as analyze_outbound
++from .wes import WesResult, analyze as analyze_wes
++WES='get_wes_dispatch_snapshot'
+ OUTBOUND='get_outbound_allocation_snapshot'
+ 
+ READ='get_stock_work_detail'
+@@ -17,6 +19,7 @@
+ 
+     @staticmethod
+     def plan(goal, rule_mode=False):
++        if goal.kind=='DIAGNOSE_WES_DISPATCH': return [({WES},goal.entity)]
+         if goal.kind=='DIAGNOSE_OUTBOUND_ALLOCATION': return [({OUTBOUND},goal.entity)]
+         if goal.kind=='DEEP_DIAGNOSE_STOCK_WORK': return [({READ},goal.entity),({EVENTS},goal.entity)]
+         if goal.kind=='COMPARE_STOCK_WORK': return [({READ},a) for a in goal.entities]
+@@ -27,6 +30,10 @@
+ 
+     @staticmethod
+     def validate_result(p,args,alias,raw,prior):
++        if alias==WES:
++            result=WesResult.model_validate(raw)
++            if (result.warehouse_id,result.device_code,result.requested_limit)!=(args.warehouse_id,args.device_code,args.requested_limit): raise ValueError('dispatch entity mismatch')
++            return result.model_dump()
+         if alias==OUTBOUND:
+             result=OutboundResult.model_validate(raw)
+             if (result.warehouse_id,result.order_id)!=(args.warehouse_id,args.order_id): raise ValueError('entity mismatch')
+@@ -91,6 +98,9 @@
+ 
+     @classmethod
+     def outcome(cls,goal,completed,rule_mode=False):
++        if goal.kind=='DIAGNOSE_WES_DISPATCH':
++            raw=completed[0]['facts']; result=WesResult.model_validate(raw)
++            return dict(goal_status='SATISFIED' if result.status=='FOUND' else 'PARTIAL',completed_steps=completed,diagnosis=analyze_wes(result),evidence_hash=digest(raw))
+         if goal.kind=='DIAGNOSE_OUTBOUND_ALLOCATION':
+             raw=completed[0]['facts']; result=OutboundResult.model_validate(raw)
+             return dict(goal_status='SATISFIED' if result.status=='FOUND' else 'PARTIAL',completed_steps=completed,diagnosis=analyze_outbound(result),evidence_hash=digest(raw))
+--- a/agent/main.py
++++ b/agent/main.py
+@@ -1,5 +1,5 @@
+ import argparse,json,os,uuid
+-from .contracts import GoalContract,StockWorkArgs,Principal,OutboundArgs
++from .contracts import GoalContract,StockWorkArgs,Principal,OutboundArgs,WesArgs
+ from .store import Store,RULES
+ from .provider import FixtureProvider,ChatCompatibleProvider
+ from .tools import FixtureStoneService,StoneHttpService,make_registry,authorize
+@@ -25,12 +25,18 @@
+         a=sub.add_parser(cmd); a.add_argument('message'); a.add_argument('--warehouse',required=True,type=int); a.add_argument('--task',required=True,type=int)
+     a=sub.add_parser('compare'); a.add_argument('message'); a.add_argument('--warehouse',required=True,type=int); a.add_argument('--tasks',required=True,type=int,nargs='+')
+     a=sub.add_parser('outbound-diagnose'); a.add_argument('message'); a.add_argument('--warehouse',required=True,type=int); a.add_argument('--order',required=True,type=int); a.add_argument('--key',default=None)
++    a=sub.add_parser('wes-diagnose'); a.add_argument('message'); a.add_argument('--warehouse',required=True,type=int); a.add_argument('--device',required=True); a.add_argument('--limit',required=True,type=int); a.add_argument('--key',default=None)
+     a=sub.add_parser('propose'); a.add_argument('message')
+     for cmd in ['resume','inspect','cancel']:
+         a=sub.add_parser(cmd); a.add_argument('run_id')
+     args=p.parse_args(); runtime=build(args.db,args.live_model); actor=Principal('demo','local-dev',frozenset(int(x) for x in os.getenv('STONE_ALLOWED_WAREHOUSES','1').split(',')))
+     if args.command=='propose':
+         result=propose(args.message,actor,runtime.provider if args.live_model else None)
++    elif args.command=='wes-diagnose':
++        entity=WesArgs(warehouse_id=args.warehouse,device_code=args.device,requested_limit=args.limit); authorize(actor,entity)
++        goal=GoalContract(kind='DIAGNOSE_WES_DISPATCH',entity=entity,provenance='CONFIRMED_STRUCTURED_INPUT')
++        rid=runtime.store.submit(actor,'cli',args.key or str(uuid.uuid4()),args.message,goal)
++        result=runtime.advance(actor,rid)
+     elif args.command=='outbound-diagnose':
+         entity=OutboundArgs(warehouse_id=args.warehouse,order_id=args.order); authorize(actor,entity)
+         goal=GoalContract(kind='DIAGNOSE_OUTBOUND_ALLOCATION',entity=entity,provenance='CONFIRMED_STRUCTURED_INPUT')
+--- a/agent/api.py
++++ b/agent/api.py
+@@ -37,7 +37,7 @@
+     if not token or len(token)<16: raise RuntimeError('set POC_DEV_TOKEN (at least 16 characters); local development only')
+     runtime=build(os.getenv('POC_DB','demo.sqlite'),os.getenv('POC_LIVE_MODEL')=='1')
+     sessions=SessionService(runtime.store,runtime.provider if os.getenv('POC_LIVE_MODEL')=='1' else None)
+-    app=FastAPI(title='Stone Agent v0.7 — local development')
++    app=FastAPI(title='Stone Agent v0.8 — local development')
+     def principal(auth):
+         if not auth or not hmac.compare_digest(auth,'Bearer '+token): raise HTTPException(401,'Unauthorized')
+         return Principal('demo','local-dev',frozenset(int(x) for x in os.getenv('STONE_ALLOWED_WAREHOUSES','1').split(',')))
