@@ -23,6 +23,10 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
+      - name: Validate dependency compatibility
+        run: |
+          python -m pip check
+          python -c "from fastapi.testclient import TestClient; import fastapi, starlette, httpx; print(fastapi.__version__, starlette.__version__, httpx.__version__)"
       - name: Migrate dedicated CI database
         env:
           AGENT_DATABASE_URL: postgresql://agent_test:ci_only_password@127.0.0.1:5432/agent_test
