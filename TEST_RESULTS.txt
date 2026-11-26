@@ -1,5 +1,10 @@
-v0.9.8 verified CI (2026-11-26)
-Previous v0.9.7 final Agent 45766629055 and 45766574348 success; Stone 45766622682 and 45766603683 success. Default main contains only README, not full engineering branch.
-Agent ca43db42aa224af786d78b55bb8e52bd75071998: run 45767119437, 357 passed, 1 warning in 49.18s; 11 new tests. Dependency validation, PostgreSQL migrations/regression, fixture gate and artifact upload succeeded.
-Synthetic fixture gold v1: 44 cases, 33 exact (75%); confirmable goal and entity accuracy each 10/20 (50%); unsupported 13/13, clarification 7/8, authorization 3/3; zero false/wrong confirmation, zero model requests. 11 coverage misses, not a live LLM score. P50/P95 0.013/0.028ms local rule latency, no model tokens reported. Artifact semantic-fixture-baseline.
-No external model configuration supplied; live evaluation, customer-reviewed corpus, actual deployment and production authorization not verified. No Stone changes, no schema change, no business execution. Final documentation commit CI tracked separately.
+Stone Agent v0.9.9 multi-turn session evaluation
+Base: v0.9.8 branch commit ce285f323521ef65908cf7aec4dbf6355ca73a7a.
+Branch: agent/multiturn-evaluation-v0.9.9.
+Core code commit: 19b078559355d236e43f419db93ca7a10ba7af51.
+Core CI: 45770395968 — 365 passed, 1 warning, 54.48s. PostgreSQL migrations/integration and both evaluation artifacts uploaded.
+Multi-turn fixture gold: 14/14 scenarios, 30/30 turns exact; 16 explicit local confirmations; 15 completed local fixture runs; 17 durable business-query invocation records; zero false/wrong confirmations; 0 runtime model calls; 0 live model requests; 0 Stone HTTP calls; 0 Stone business writes. Local propose latency P50/P95 2.215/12.165 ms, not LLM latency.
+Actions upgraded to checkout@v6, setup-python@v6, upload-artifact@v6 (Node 24), removing Node 20 runtime warnings. One upstream Starlette/AnyIO DeprecationWarning remains and is tracked separately.
+Initial draft CI failed twice due evaluator metrics assuming error expectations contain a status; fixed, full regression passed. A later accounting correction uses durable invocation ledger to count history-receipt steps.
+No changes to Stone repository, APIs, database schema, or production write path. Real model endpoint not configured; no live LLM score claimed.
+Documentation commit CI is tracked separately.

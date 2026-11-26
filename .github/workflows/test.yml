@@ -18,8 +18,8 @@ jobs:
           --health-cmd "pg_isready -U agent_test -d agent_test"
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
@@ -39,7 +39,15 @@ jobs:
         run: |
           python -m agent.eval_goals --mode fixture --fail-on-critical > semantic-baseline.json
           python -c "import json; print(json.dumps(json.load(open('semantic-baseline.json'))['metrics'], ensure_ascii=False))"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: semantic-fixture-baseline
           path: semantic-baseline.json
+      - name: Publish synthetic multi-turn session baseline
+        run: |
+          python -m agent.eval_sessions --mode fixture --fail-on-critical > session-baseline.json
+          python -c "import json; print(json.dumps(json.load(open('session-baseline.json'))['metrics'], ensure_ascii=False))"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: multi-turn-session-fixture-baseline
+          path: session-baseline.json
