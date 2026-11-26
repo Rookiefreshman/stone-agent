@@ -1,9 +1,3 @@
-# Stone Agent — v0.8 WES 调度诊断
+# Stone Agent v0.9 — READY cancellation preview and approval rehearsal
 
-本分支继承 v0.7 增量模块，并包含 v0.8 WES 规则、测试与可应用升级补丁。完整历史 runtime 仍未导入 GitHub，因此当前远程分支不是完整可运行工程；使用本轮完整 ZIP 或在已验收的 v0.7 基线上应用补丁。真实 PG/MySQL/LLM 联调尚未完成。
-
-- Stone 对应分支：https://github.com/Rookiefreshman/Stone/tree/agent/wes-diagnostics-v0.8
-- 新模块：agent/integrations/wes.py；tests/test_wes.py；patches/v0.7-to-v0.8.patch
-- 本地完整测试：251 passed / 4 skipped，新增41项，历史210项；三份增量文件 Git Blob SHA 与本地一致。
-- 在 v0.7 完整工程复制新增源码和测试，git apply --check 并应用补丁，再运行 python -m pytest -q -rs。
-- 当前为 Public 仓库，严禁提交真实数据或凭据；仅结构化查询，不允许业务写入。
+Development-only. No write dispatcher and no business POST tools. This branch contains incremental modules, migrations, tests and upgrade patches, not the complete runtime until full baseline import. Use the full v0.9 ZIP to stage the reviewed source through scripts/stage_agent_baseline.py with the exact current branch HEAD, then inspect, test, commit and push normally. No production data or credentials should be committed. For v0.8 local source, copy the new files and apply patches/v0.8-to-v0.9.patch; the full ZIP includes the frozen offline SQL artifact required by tests. See docs/PROJECT_CHECKLIST.md and Stone branch docs/agent-ready-cancel-gate.md. Local test results: 263 passed / 5 skipped excluding Worker; 10 Worker passed. PostgreSQL, Java/MySQL, real LLM and enterprise authorization pending. Approvals only for synthetic evidence, deliberately do not create write jobs. Run Alembic upgrade head to 0004_cancel_drafts after backup and stopping old versions; no downgrade without reviewed backup.
