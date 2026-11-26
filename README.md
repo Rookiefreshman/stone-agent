@@ -1,10 +1,9 @@
-# Stone Agent — v0.7 出库诊断开发分支
+# Stone Agent — v0.8 WES 调度诊断
 
-本分支包含 v0.7 新增业务规则模块、v0.6.1 至 v0.7 的运行时升级补丁，以及新增的 34 项测试源码。**完整 v0.6.1 runtime 尚未导入远程仓库，本分支不是完整可部署工程。** 完整 v0.7 工程通过本次 ZIP 交付，导入后才能执行完整 CI。
+本分支继承 v0.7 增量模块，并包含 v0.8 WES 规则、测试与可应用升级补丁。完整历史 runtime 仍未导入 GitHub，因此当前远程分支不是完整可运行工程；使用本轮完整 ZIP 或在已验收的 v0.7 基线上应用补丁。真实 PG/MySQL/LLM 联调尚未完成。
 
-- Stone 对应分支：https://github.com/Rookiefreshman/Stone/tree/agent/outbound-diagnostics-v0.7
-- 新模块：`agent/integrations/outbound.py`
-- 升级补丁：`patches/v0.6.1-to-v0.7.patch`（仅修改原有六个文件）
-- 测试：`tests/test_outbound.py`（依赖完整 v0.6.1 基线）
-
-在干净的 v0.6.1 本地工程上复制新增模块及测试，再执行 `git apply --check` / `git apply` 补丁后运行 `python -m pytest -q -rs`。本地完整工程已分别通过历史 176 项和新增 34 项测试，4 项 PG 集成因 DSN 缺失跳过；GitHub CI 尚未运行。新增出库诊断使用结构化 CLI/API，托管会话自然语言入口待开发。生产写操作关闭，不能把当前快照推断为历史失败原因。
+- Stone 对应分支：https://github.com/Rookiefreshman/Stone/tree/agent/wes-diagnostics-v0.8
+- 新模块：agent/integrations/wes.py；tests/test_wes.py；patches/v0.7-to-v0.8.patch
+- 本地完整测试：251 passed / 4 skipped，新增41项，历史210项；三份增量文件 Git Blob SHA 与本地一致。
+- 在 v0.7 完整工程复制新增源码和测试，git apply --check 并应用补丁，再运行 python -m pytest -q -rs。
+- 当前为 Public 仓库，严禁提交真实数据或凭据；仅结构化查询，不允许业务写入。
