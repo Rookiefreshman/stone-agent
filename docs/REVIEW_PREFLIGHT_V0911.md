@@ -40,3 +40,8 @@ LEASE_EXPIRED 不修改历史状态，不消费新预算。当前仍无法区分
 新增回归覆盖真实 loopback HTTP 的迟到回执、四个身份字段不符、重启恢复、租约内/过期/后续接管的幂等重放、过时预检、只读 CLI、权限/服务绑定/证据校验及预算耗尽后禁止继续 GET；另有独立 PostgreSQL 并发不同 request_id 竞争测试。实际 Stone Java/MySQL 未修改；本轮不宣称新做真实 Stone、LLM、企业授权或目标部署环境验收。
 
 基线 32cfafc 的 Push/PR CI 45775116592 / 45775121473 均成功。当前本地测试环境准备因自动审批检查的使用额度限制受阻；新增代码测试结果以本轮实际 CI 为准，未执行项保持未验收。
+
+## 本轮实际验收证据
+代码提交 e9ed60196c8b5b7d445d0dd9305a33cba565bcad 的 Push CI [45785967903](https://github.com/Rookiefreshman/stone-agent/actions/runs/45785967903) 成功：407 passed，1 warning in 75.56s，零跳过，包含12项新增用例及累计9项 PostgreSQL 集成。依赖一致性检查、0007_receipt_review 全新库迁移、单轮33/44、多轮14/14场景30/30回合合成基线与工件上传全部通过。合成基线不是真实模型准确率。5个提交文件已按不可变 commit 逐一读取，与提交原文完全一致。既有 Starlette/AnyIO DeprecationWarning 未屏蔽；本地回归未执行。
+
+代码和文档位于独立分支 agent/review-preflight-v0.9.11，[草稿 PR #14](https://github.com/Rookiefreshman/stone-agent/pull/14) 基于 v0.9.10；未合并 main，真实企业身份、审批、发送账本和业务写入继续关闭。

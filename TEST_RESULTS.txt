@@ -1,7 +1,9 @@
-Stone Agent v0.9.10 model HTTP contract
-Base: b9c99457fe0b2ac09d62c627aedc7e24492809c8 (v0.9.9).
-Core: ca8394729cd1443661bed7ea7959b5dd40c6b5d1.
-CI 45774491535: 393 passed, 1 warning, 71.70s; 28 additional localhost HTTP and evaluator tests; PostgreSQL migration and integration, both synthetic reports passed.
-Single-turn fixture 33/44, diagnostic counts MATCHED 33 / FIXTURE_OR_CONTEXT_MISMATCH 11; multi-turn fixture 14/14 scenarios, 30/30 turns, 16 confirmations, 15 completed fixture runs, 17 invocation records; critical proposals 0; live model requests 0. No external model or Stone business HTTP/writes.
-Python warning remains upstream Starlette/AnyIO TestClient alias. Two additional localhost network failure tests (timeout and refused connection) passed. Code commit c1b78ee28017ea1aed7ad20a81840d0ac3cab079, push CI 45774817602: 395 passed, 1 warning, 67.56s. Both synthetic metrics unchanged. Documentation-only follow-up CI tracked separately.
-No production identity, approval, write path, tool schema, or migration changes.
+v0.9.11 review preflight regression (2026-11-26)
+Baseline: 32cfafcdf8b0a480e7e8c21927652b0070982c4e; Push/PR runs 45775116592 / 45775121473 succeeded.
+Code commit: e9ed60196c8b5b7d445d0dd9305a33cba565bcad.
+Push CI: 45785967903; 407 passed, 1 warning in 75.56s; zero skipped.
+12 new cases including one PostgreSQL concurrent distinct-request review; 9 total PG integration cases ran.
+Dependency compatibility, clean PG migrations to 0007_receipt_review, synthetic goal baseline (33/44), synthetic sessions (14/14 scenarios, 30/30 turns), and both artifacts succeeded.
+5 submitted files fetched at the immutable code commit exactly match submitted UTF-8 contents.
+Existing Starlette/AnyIO DeprecationWarning remains. Local regression was not run: local environment preparation was blocked by automatic approval review due to usage limits.
+This iteration uses isolated loopback HTTP and dedicated CI PostgreSQL. No new Stone Java/MySQL, external LLM, enterprise IAM or deployment-environment validation. No business POST, dispatch, approval conversion or schema changes.

@@ -28,4 +28,4 @@ Stone Java 8 / MySQL 5.7 与 8.0 各38项 Maven 测试及6组真实 HTTP 契约�
 
 - v0.9.10：[模型 HTTP 协议与评测失败分类](docs/MODEL_HTTP_CONTRACT_V0910.md)；复用既有目标及执行策略，增加隔离 HTTP 合同测试与评测归因。真实模型未验收。
 
-- v0.9.11：[人工复核预检与单次请求状态](docs/REVIEW_PREFLIGHT_V0911.md)。新增 review-preview、明确人工查询可用性、保留原 request_id 的查询状态与证据；GET 总预算不变，真实写入关闭。本轮代码 CI 待验收。
+- v0.9.11：[人工复核预检与单次请求状态](docs/REVIEW_PREFLIGHT_V0911.md)。新增 review-preview、明确人工查询可用性、保留原 request_id 的查询状态与证据；GET 总预算不变，真实写入关闭。[代码 CI 407 passed / 1 warning](https://github.com/Rookiefreshman/stone-agent/actions/runs/45785967903)，含12项新增及9项 PG 集成；单轮/多轮合成基线不变。
