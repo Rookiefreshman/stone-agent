@@ -144,7 +144,6 @@ def evaluate(data,provider=None,repeats=1):
                 runtime=Runtime(store,runtime_provider,make_registry(domain))
                 clock=[1_000_000.0]
                 sessions={}
-                scenario_rows=[]
                 failed=False
                 for index,step in enumerate(scenario["steps"]):
                     if failed:
@@ -161,6 +160,9 @@ def evaluate(data,provider=None,repeats=1):
                     expected=_expected(step,provider is not None)
                     request_before=capture.requests if capture else 0
                     turns_before=len(capture.turns) if capture else 0
+                    calls_before=domain.calls
+                    runtime_calls_before=runtime_provider.calls
+                    fixture_completed=False
                     started=time.perf_counter()
                     try:
                         result=service.propose(principal,sid,f'{scenario["id"]}:{repeat}:{step["id"]}',message)
@@ -188,6 +190,7 @@ def evaluate(data,provider=None,repeats=1):
                             if step.get("complete_fixture",False):
                                 executed=runtime.advance(principal,confirmation["run_id"])
                                 execution_ok=executed["state"]=="COMPLETED"
+                                fixture_completed=execution_ok
                                 if runtime_provider.calls:
                                     execution_ok=False
                             if not execution_ok:
@@ -203,8 +206,9 @@ def evaluate(data,provider=None,repeats=1):
                         "raw":raw,"raw_schema_valid":raw is not None,"exact":exact,"execution_ok":execution_ok,
                         "confirmation_created":confirmation is not None and "run_id" in confirmation,
                         "latency_ms":round(elapsed,3),"tokens":tokens,"model_requests":(capture.requests-request_before) if capture else 0,
-                        "fixture_calls_total":domain.calls,"runtime_model_calls":runtime_provider.calls}
-                    rows.append(row); scenario_rows.append(row)
+                        "fixture_calls_delta":domain.calls-calls_before,"fixture_completed":fixture_completed,
+                        "runtime_model_calls_delta":runtime_provider.calls-runtime_calls_before}
+                    rows.append(row)
                     if not exact or not execution_ok: failed=True
                 scenario_hashes[scenario["id"]].append(digest([{"actual":r.get("actual"),"execution_ok":r.get("execution_ok"),"skipped":r.get("skipped",False)} for r in rows if r.get("scenario_id")==scenario["id"] and r.get("repeat")==repeat]))
     executed=[r for r in rows if not r.get("skipped")]
@@ -227,7 +231,6 @@ def evaluate(data,provider=None,repeats=1):
             "turns":len(items),"executed_turns":len(run_items),"exact_turns":sum(r.get("exact",False) and r.get("execution_ok",True) for r in run_items),
             "turn_exact_rate":ratio(sum(r.get("exact",False) and r.get("execution_ok",True) for r in run_items),len(run_items))}
     scenario_total=len(data["scenarios"])*repeats
-    scenario_exact=sum(1 for sid,hashes in scenario_hashes.items() for _ in [] ) # replaced below
     scenario_exact_count=sum(1 for repeat in range(1,repeats+1) for s in data["scenarios"] if all(r.get("exact",False) and r.get("execution_ok",True) and not r.get("skipped",False) for r in rows if r["scenario_id"]==s["id"] and r["repeat"]==repeat))
     metrics={"scenarios":scenario_total,"exact_scenarios":scenario_exact_count,"scenario_exact_rate":ratio(scenario_exact_count,scenario_total),
         "expected_turns":total_turns*repeats,"executed_turns":len(executed),"skipped_turns":sum(r.get("skipped",False) for r in rows),
@@ -235,9 +238,9 @@ def evaluate(data,provider=None,repeats=1):
         "confirmable_goal_entity_exact_rate":ratio(sum(r["exact"] for r in positives),len(positives)),
         "false_confirmation_count":false_confirm,"wrong_confirmation_count":wrong_confirm,"critical_proposal_count":false_confirm+wrong_confirm,
         "confirmation_count":sum(r.get("confirmation_created",False) for r in executed),
-        "fixture_completed_runs":sum(1 for r in executed if r.get("confirmation_created") and r.get("execution_ok") and r.get("confirmation_created") and r.get("actual",{}).get("status")=="NEEDS_CONFIRMATION"),
-        "fixture_service_invocations":max((r.get("fixture_calls_total",0) for r in executed),default=0),
-        "runtime_model_calls":sum(r.get("runtime_model_calls",0) for r in executed),
+        "fixture_completed_runs":sum(r.get("fixture_completed",False) for r in executed),
+        "fixture_service_invocations":sum(r.get("fixture_calls_delta",0) for r in executed),
+        "runtime_model_calls":sum(r.get("runtime_model_calls_delta",0) for r in executed),
         "model_requests":capture.requests if capture else 0,"raw_schema_valid_count":sum(r.get("raw_schema_valid",False) for r in executed),
         "raw_confirmable_exact_rate":ratio(raw_exact,len(model_positive)),
         "reported_token_sum":sum(tokens) if tokens else None,"reported_token_coverage":ratio(len(tokens),capture.requests if capture else 0),
