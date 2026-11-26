@@ -11,7 +11,7 @@ HTTP 分类：MODEL_HTTP_AUTH(401/403)、MODEL_HTTP_RATE_LIMIT(429)、MODEL_HTTP
 单轮和多轮 JSON 报告增加 provider_error_code、diagnosis 和聚合 diagnostic_counts/provider_error_counts。分类 MATCHED、PROVIDER_FAILURE、TOOL_PROTOCOL_MISMATCH、CANDIDATE_SCHEMA_INVALID、RAW_CANDIDATE_MISMATCH、POST_VALIDATION_MISMATCH、NONCONFIRMABLE_EXPECTATION_MISMATCH、CONTEXT_OR_RULE_MISMATCH、FIXTURE_OR_CONTEXT_MISMATCH、CONFIRMATION_OR_RUNTIME_FAILED、SKIPPED_AFTER_MISMATCH。分类依据实际返回及预期，不是根因证明；非可确认预期不武断判定模型错误。多轮出错停止依赖回合，禁止确认错误提议。原指标不变。
 
 ## 验收及运行
-真实 HTTP 合同测试使用本地 ThreadingHTTPServer，不使用真实模型或 Stone，不改数据库或业务写入。覆盖认证、HTTP 状态、重定向、重复 JSON key、非法 envelope、截断、usage、限长和评测故障归因。
+真实 HTTP 合同测试使用本地 ThreadingHTTPServer，不使用真实模型或 Stone，不改数据库或业务写入。覆盖认证、HTTP 状态、重定向、重复 JSON key、非法 envelope、截断、usage、限长和评测故障归因；补充 localhost 读超时与连接拒绝测试。核心 CI [45774491535](https://github.com/Rookiefreshman/stone-agent/actions/runs/45774491535) 实测 393 passed / 1 warning（新增28项），单轮33/44，多轮30/30，错误可确认候选0，模型真实请求0；警告仍是 Starlette/AnyIO TestClient 弃用别名。
 ```bash
 python -m pytest -q tests/test_model_http.py
 python -m agent.eval_goals --mode fixture --fail-on-critical

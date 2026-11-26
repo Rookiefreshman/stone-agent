@@ -1,6 +1,8 @@
 """Actual localhost HTTP tests; no external service or actual Stone writes."""
 import json
+import socket
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -30,7 +32,8 @@ def server():
         def do_POST(self):
             body=self.rfile.read(int(self.headers['Content-Length']))
             requests.append((self.path,self.headers.get('Authorization'),json.loads(body)))
-            status,raw,headers=responses.pop(0)
+            status,raw,headers,delay=responses.pop(0)
+            if delay: time.sleep(delay)
             self.send_response(status)
             self.send_header('Content-Type','application/json')
             for k,v in headers.items(): self.send_header(k,v)
@@ -46,9 +49,9 @@ def server():
     thread=threading.Thread(target=httpd.serve_forever,daemon=True)
     thread.start()
     base=f'http://127.0.0.1:{httpd.server_port}/v1'
-    def queue(payload=None,status=200,headers=None):
+    def queue(payload=None,status=200,headers=None,delay=0):
         raw=payload if isinstance(payload,bytes) else json.dumps(payload).encode()
-        responses.append((status,raw,headers or {}))
+        responses.append((status,raw,headers or {},delay))
     try: yield base,queue,requests
     finally:
         httpd.shutdown()
@@ -151,3 +154,21 @@ def test_multiturn_transport_failure_skips_dependent_turn(server):
     assert report['metrics']['provider_error_counts']=={'MODEL_HTTP_SERVER':1}
     assert report['metrics']['confirmation_count']==0 and report['metrics']['model_requests']==1
     assert report['stone_http_calls']==report['stone_business_writes']==0 and len(requests)==1
+
+
+def test_read_timeout_no_automatic_retry(server):
+    base,queue,requests=server
+    queue(envelope(),delay=0.4)
+    with pytest.raises(ProviderError,match='MODEL_TIMEOUT'):
+        ChatCompatibleProvider(base,MODEL,timeout=0.1).generate({'model':MODEL})
+    assert len(requests)==1
+
+
+def test_refused_connection_is_transport_failure():
+    # Hold a bound loopback port without listen() so no other process can
+    # take it and accidentally return an HTTP response.
+    with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as sock:
+        sock.bind(('127.0.0.1',0))
+        base=f'http://127.0.0.1:{sock.getsockname()[1]}/v1'
+        with pytest.raises(ProviderError,match='MODEL_TRANSPORT'):
+            ChatCompatibleProvider(base,MODEL,timeout=1).generate({'model':MODEL})
