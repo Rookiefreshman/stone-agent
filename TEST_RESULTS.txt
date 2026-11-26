@@ -1,0 +1,5 @@
+v0.9.1 local regression (2026-11-26)
+Baseline: python -m pytest -q -rs -> 273 passed, 5 skipped in 34.90s
+New: python -m pytest -q tests/test_receipts.py -> 18 passed in 7.78s
+Combined: 291 passed, 5 skipped (separate runs). Skipped: 5 TEST_POSTGRES_DSN integration cases.
+Java/Maven/MySQL/real LLM/enterprise authorization: not executed. GitHub CI outcome pending.
