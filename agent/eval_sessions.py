@@ -160,7 +160,8 @@ def evaluate(data,provider=None,repeats=1):
                     expected=_expected(step,provider is not None)
                     request_before=capture.requests if capture else 0
                     turns_before=len(capture.turns) if capture else 0
-                    calls_before=domain.calls
+                    fixture_invocations=0
+                    rule_invocations=0
                     runtime_calls_before=runtime_provider.calls
                     fixture_completed=False
                     started=time.perf_counter()
@@ -191,6 +192,11 @@ def evaluate(data,provider=None,repeats=1):
                                 executed=runtime.advance(principal,confirmation["run_id"])
                                 execution_ok=executed["state"]=="COMPLETED"
                                 fixture_completed=execution_ok
+                                if fixture_completed:
+                                    audit=store.inspect(principal,confirmation["run_id"])
+                                    rule_invocations=len(audit["invocations"])
+                                    fixture_aliases={"get_stock_work_detail","get_stock_work_events","get_outbound_allocation_snapshot","get_wes_dispatch_snapshot"}
+                                    fixture_invocations=sum(inv["alias"] in fixture_aliases for inv in audit["invocations"])
                                 if runtime_provider.calls:
                                     execution_ok=False
                             if not execution_ok:
@@ -206,7 +212,7 @@ def evaluate(data,provider=None,repeats=1):
                         "raw":raw,"raw_schema_valid":raw is not None,"exact":exact,"execution_ok":execution_ok,
                         "confirmation_created":confirmation is not None and "run_id" in confirmation,
                         "latency_ms":round(elapsed,3),"tokens":tokens,"model_requests":(capture.requests-request_before) if capture else 0,
-                        "fixture_calls_delta":domain.calls-calls_before,"fixture_completed":fixture_completed,
+                        "fixture_invocations":fixture_invocations,"rule_invocations":rule_invocations,"fixture_completed":fixture_completed,
                         "runtime_model_calls_delta":runtime_provider.calls-runtime_calls_before}
                     rows.append(row)
                     if not exact or not execution_ok: failed=True
@@ -239,7 +245,8 @@ def evaluate(data,provider=None,repeats=1):
         "false_confirmation_count":false_confirm,"wrong_confirmation_count":wrong_confirm,"critical_proposal_count":false_confirm+wrong_confirm,
         "confirmation_count":sum(r.get("confirmation_created",False) for r in executed),
         "fixture_completed_runs":sum(r.get("fixture_completed",False) for r in executed),
-        "fixture_service_invocations":sum(r.get("fixture_calls_delta",0) for r in executed),
+        "fixture_service_invocations":sum(r.get("fixture_invocations",0) for r in executed),
+        "local_rule_invocations":sum(r.get("rule_invocations",0) for r in executed),
         "runtime_model_calls":sum(r.get("runtime_model_calls_delta",0) for r in executed),
         "model_requests":capture.requests if capture else 0,"raw_schema_valid_count":sum(r.get("raw_schema_valid",False) for r in executed),
         "raw_confirmable_exact_rate":ratio(raw_exact,len(model_positive)),
