@@ -22,7 +22,8 @@ def test_fixture_multi_turn_session_baseline():
     assert m["scenarios"]==14 and m["exact_scenarios"]==14 and m["scenario_exact_rate"]==1
     assert m["expected_turns"]==30 and m["executed_turns"]==30 and m["skipped_turns"]==0
     assert m["critical_proposal_count"]==0
-    assert m["confirmation_count"]>0 and m["fixture_service_invocations"]>0
+    assert m["confirmation_count"]==16 and m["fixture_completed_runs"]==15
+    assert m["fixture_service_invocations"]==17 and m["local_rule_invocations"]==17
     assert m["runtime_model_calls"]==0 and m["model_requests"]==0
     assert r["stone_http_calls"]==r["stone_business_writes"]==0
     assert r["unstable_scenarios"] is None
