@@ -1,4 +1,5 @@
-v0.9.6 verified CI results (2026-11-26)
-Agent 69695dc564ad3fb2ca1b012ee74f70fb3e18052a: run 45765456480, 325 passed, 1 warning in 49.69s; 8 new tests including 1 PostgreSQL concurrent manual review (8 PostgreSQL integration cases total).
-Stone 5b7917e3f050551de1054d44308844b58d8ab333: run 45765488016, MySQL 5.7/8.0 each 45 tests, 0 failures/errors/skipped; eight real HTTP contract groups passed per matrix. Actual 401 then corrected read credential, explicit one-shot manual review, matching receipt and idempotent audit; selected database counts and balances unchanged, business POST=0.
-No production IAM, actual dispatch, actual write-response loss, target populated database migration or production acceptance tested. Local operator only. Final documentation commit CI tracked separately.
+v0.9.7 verified CI results (2026-11-26)
+Initial Agent run 45766133202: failed at Python test collection due to malformed generated regex source; fixed in 5596372.
+Agent 5596372d5af0f96f1de6c91df0538cdd00398361: run 45766300805, 346 passed, 1 warning in 52.42s; 21 additional cases (fixture grammar, simulated provider, session/API and safety boundaries).
+Stone af0f02e4e34df2be46d542cc7c4b9f4ea66fe753: run 45766336138, MySQL 5.7/8.0 each 45 Java tests, zero failures/errors/skips; nine actual HTTP groups each. Managed natural language fixture proposal, explicit typed confirmation and real read-only execution for all three goals; no execution model attempts; business_posts=0.
+No real external LLM or production identity, write dispatch or production acceptance tested. Final documentation commit CI tracked separately.

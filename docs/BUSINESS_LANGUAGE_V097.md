@@ -22,4 +22,4 @@ POST /api/v1/sessions/{sid}/goal-proposals/{pid}/confirm 后，沿用 Worker 或
 真实 LLM 需 POC_LIVE_MODEL=1、MODEL_BASE_URL、MODEL_NAME、必要时 MODEL_API_KEY，真实 Stone 需独立开发环境 STONE_LIVE_DOMAIN=1、STONE_BASE_URL 及只读凭据；仍使用当前本地开发身份，不可公开暴露。真实外部 LLM 不在自动化 CI 中。不得把测试指向生产库。
 
 ## 验收
-首次 Agent CI 45766133202 失败（源代码生成时正则末尾符号误展开，测试收集语法错误），已修复提交 5596372d5af0f96f1de6c91df0538cdd00398361；回归 45766300805。Stone 通过固定该 Agent SHA 的工作流 af0f02e4e34df2be46d542cc7c4b9f4ea66fe753 执行真实 Java/MySQL 只读链路，CI 45766336138。真实跨服务使用 Fixture 语法与明确确认，而非实际外部 LLM。最终 CI 结果见运行日志，未完成不得标记通过。生产写入继续关闭；真实模型语义准确率、真实 IAM、发送意图、生产数据库迁移及生产验收未完成。
+首次 Agent CI 45766133202 失败（源代码生成时正则末尾符号误展开，测试收集语法错误），已修复提交 5596372d5af0f96f1de6c91df0538cdd00398361；回归 45766300805。Stone 通过固定该 Agent SHA 的工作流 af0f02e4e34df2be46d542cc7c4b9f4ea66fe753 执行真实 Java/MySQL 只读链路，CI 45766336138。真实跨服务使用 Fixture 语法与明确确认，而非实际外部 LLM。修复后的 Agent CI 实测 346 passed, 1 warning in 52.42s（新增21项，含历史 PostgreSQL 集成）；Stone MySQL 5.7/8.0 各45项，0失败/错误/跳过，9组实际 HTTP 检查均通过；新增组逐一确认三类目标后执行真实 Stone 查询，RULE 模式无执行模型调用，业务 POST=0。生产写入继续关闭；真实模型语义准确率、真实 IAM、发送意图、生产数据库迁移及生产验收未完成。

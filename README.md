@@ -3,7 +3,7 @@
 完整 Python Runtime、Session、Worker、Registry、HTTP/LOCAL 诊断、SQLite/PostgreSQL、Alembic 和 CI。v0.9.2 新增仅合成数据的持久化故障演练：一次性模拟审批消费、持久模拟发送意图、租约/fencing、迟到回执和有界对账。无真实写 dispatcher 或生产审批授权。
 
 - Python 3.11+：`pip install -r requirements.txt`，`python -m pytest -q -rs`
-- CI：[325 passed，1 warning](https://github.com/Rookiefreshman/stone-agent/actions/runs/45765456480)（核心提交 69695dc，含8项 PG 集成）；[Stone 双 MySQL 各45项及8组实际 HTTP](https://github.com/Rookiefreshman/Stone/actions/runs/45765488016)。
+- CI：[346 passed，1 warning](https://github.com/Rookiefreshman/stone-agent/actions/runs/45766300805)（核心提交 5596372）；[Stone 双 MySQL 各45项及9组实际 HTTP](https://github.com/Rookiefreshman/Stone/actions/runs/45766336138)。
 - 数据库：Agent PostgreSQL head 为 0007_receipt_review；旧版 API/Worker 停止、备份后运行 alembic upgrade head。Stone MySQL V6 不变。
 - 启动与部署见 [INTEGRATION](docs/INTEGRATION.md)、[PERSISTENCE_WORKER](docs/PERSISTENCE_WORKER.md)、[SESSION_PROTOCOL](docs/SESSION_PROTOCOL.md)。
 - 诊断：[历史回执](docs/DISPATCH_HISTORY_V061.md)、[出库](docs/OUTBOUND_DIAGNOSTIC_V07.md)、[WES](docs/WES_DIAGNOSTIC_V08.md)。
