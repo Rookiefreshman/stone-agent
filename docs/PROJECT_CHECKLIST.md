@@ -1,6 +1,6 @@
-# Stone Agent 项目实施清单（v0.8）
+# Stone Agent 项目实施清单（v0.9.2）
 
-更新日期：2026-11-26。以实际业务价值和验收证据作为勾选依据。[x] 表示该项在注明范围内已实现或已验证；[ ] 表示未实现、未验证或存在外部依赖。代码交付不等于真实环境验收。历史版本的勾选依据为历次交付记录及 v0.8 累计回归；不代表每项都完成生产验收。
+更新日期：2026-11-26。以实际业务价值和验收证据作为勾选依据。[x] 表示该项在注明范围内已实现或已验证；[ ] 表示未实现、未验证或存在外部依赖。代码交付不等于真实环境验收。历史版本的勾选依据为历次交付记录及 v0.9.2 累计回归；不代表每项都完成生产验收。
 
 ## v0.1 业务接入（本地完成）
 - [x] Stone Java 分支的 Controller、DTO、领域规则核对
@@ -20,26 +20,30 @@
 - [x] 多轮补全及并发回归（累计 85 项）
 - [ ] 真实企业身份与完整消息历史（按业务需要推进）
 
-## v0.4 持久化和 Worker（本地完成，PG 验收未完成）
+## v0.4 持久化和 Worker（CI 独立 PG 验收完成）
 - [x] PostgreSQL 适配代码、Alembic 迁移和 CI 配置
 - [x] Run 队列、Worker 自动领取、Lease/Fencing、SSE 断点续读
 - [x] SQLite 并发及故障恢复（累计 96 项）
-- [ ] PostgreSQL 真实迁移、锁竞争、故障恢复验证
+- [x] PostgreSQL 16 CI 独立库迁移、锁竞争、故障恢复（v0.9.1/0.9.2）
+- [ ] 部署目标 PostgreSQL 环境与备份恢复验收
 - [ ] 按测量结果完善连接池、资源限制、部署与备份恢复
 
 ## v0.5 有界多步查询（本地完成）
 - [x] step_no、步骤级接受与 Invocation 唯一性、旧数据迁移代码
 - [x] 多作业对比、状态诊断、流水汇总、部分结果与恢复
 - [x] SQLite/模拟 HTTP 回归（累计 129 项）
-- [ ] PostgreSQL 在线增量迁移及多步恢复验收
+- [x] PostgreSQL 16 CI 独立库多步恢复与全新库迁移
+- [ ] 既有部署数据上的在线增量迁移验证
 
 ## v0.5.1 真实环境验收（P0，仍阻塞生产放行）
 - [x] 真实环境烟测入口、PostgreSQL CI 配置
 - [x] 确认独立 stone-agent GitHub 仓库存在，初始化 main 与独立开发分支（当前为 Public）
 - [x] 当前 v0.7 模块、升级补丁及测试提交 GitHub，并核对 Blob SHA
 - [x] 完整基线源码导入独立 GitHub 开发分支（v0.9.1 c959609）
-- [ ] GitHub CI 实际验收；若需私有化，由仓库所有者调整可见性
-- [ ] PostgreSQL 16：迁移至 0003_rule_calls，四项集成测试不再跳过
+- [x] GitHub CI 实际验收：v0.9.1 修复后 296 passed（45760593186）；v0.9.2 305 passed（45761308366）
+- [ ] 仓库可见性是否私有化由所有者决定
+- [x] PostgreSQL 16 CI 全新库迁移至 0005_rehearsal，6 项集成测试全部通过
+- [ ] 部署目标 PostgreSQL 数据迁移与运行环境验收
 - [ ] Stone Java/MySQL V1–V4：真实授权仓、已知库存任务及流水查询
 - [ ] 真实 LLM：自然语言意图、实体、工具协议、误调用与澄清评测
 - [ ] 统一提议请求模型账本、精确预算与实际模型用量
@@ -81,9 +85,9 @@
 - [x] CLI 和结构化 API、故障恢复及模拟 HTTP 验证；34 项新增 Python 测试通过，历史 176 项回归通过
 - [x] GitHub 两个仓库独立分支提交；Agent 三个核心文件 Blob SHA 与本地一致；v0.6.1 Java 历史回执扩展同步至 Stone 分支
 - [x] 完整 Agent 基线远程导入（v0.9.1 c959609）
-- [ ] CI 运行验收
+- [x] 后续完整基线 GitHub CI 回归通过（v0.9.2）
 - [ ] Stone Java Maven 编译与 7 项新增单测、真实 MySQL 集成测试执行
-- [ ] 真实 Stone 与 Agent 跨服务授权及快照证据验收，PG 在线集成
+- [ ] 真实 Stone 与 Agent 跨服务授权及快照证据验收
 - [ ] 托管会话自然语言出库目标与确认协议、真实 LLM 评测
 - [ ] 独立库存余额/库位通用查询、上架/移库可行性预检：仅按真实业务需要另行建设
 - [ ] 历史失败事件/日志可追溯性（当前成功回执不足以还原历史失败根因）
@@ -100,9 +104,9 @@
 - [x] 完整本地基线导入脚本、升级补丁检查、联调 SOP、合成演示输出
 - [x] Agent v0.8 增量源码、测试、补丁提交 GitHub（d4938bc）并核对 SHA
 - [x] 完整 Agent 基线远程导入（v0.9.1 c959609）
-- [ ] GitHub CI 实际运行验收
+- [x] 后续完整基线 GitHub CI 回归通过（v0.9.2）
 - [ ] Maven 编译、5 项 Java 单测、真实 MySQL 集成及 Java/Python 跨服务验证
-- [ ] PostgreSQL 在线集成、真实业务设备权限、容量聚合 SQL 负载测试及 LLM 语义验收
+- [ ] 真实业务设备权限、容量聚合 SQL 负载测试及 LLM 语义验收
 - [ ] 托管会话自然语言 WES/出库目标与确认协议；真实业务用户验收
 
 ## v0.9 受控业务操作（取消预检与审批演练本地完成；真实写入关闭）
@@ -112,12 +116,12 @@
 - [x] 独立开发申请人及演练审批人 token、独立仓库范围；禁止自审、拒绝、撤回、过期；真实数据禁止审批
 - [x] operation_draft / operation_event 事务账本，Alembic 0004_cancel_drafts，SQLite 本地持久化与重启检查
 - [x] REST 预检、草案、审查、撤回；无执行接口，无写工具，无写任务入队，任何状态 write_allowed=false / NEVER_DISPATCHED
-- [x] 22 项新增 Python 测试通过，累计 273 passed / 5 skipped；新增真实 PG 并发草案及审批测试源码（未运行）
+- [x] 22 项新增 Python 测试通过，累计 273 passed / 5 skipped；真实 PG 并发草案及审批测试在 v0.9.1 CI 通过
 - [x] Stone 领取与取消竞争、重复取消仅一次释放及跨仓隔离的 2 项真实 MySQL 测试源码；真实写入契约放行说明提交 9fc7922
 - [x] Agent 操作草案及迁移文件远程提交 6f20f79；本地与远程 Blob SHA 一致
 - [x] 完整运行时基线远程导入（v0.9.1 c959609；CI 验收单列）
-- [ ] GitHub CI 及真实 PostgreSQL 验收
-- [ ] Stone Maven 与 MySQL 实际并发验收；PostgreSQL 0004 在线迁移及并发审批验收
+- [x] GitHub CI 与独立 PostgreSQL 16 并发审批验收（v0.9.1/0.9.2）
+- [ ] Stone Maven 与 MySQL 实际并发验收；部署目标 PostgreSQL 既有数据迁移
 - [ ] 业务方确认首个受控操作、真实企业身份授权与审批策略；真实模型语义验收
 - [ ] Stone 服务端 operation_id 可信回执、业务幂等与结果查询；域内写事务原子性及独立授权
 - [ ] 固定真实写 Workflow、一次性审批消耗、派发前实时复查、UNKNOWN 对账和故障注入
@@ -136,9 +140,27 @@
 - [x] Stone 5 项 Java 单测及 3 项 MySQL 集成测试源码（回执、并发幂等、插入失败回滚）；已提交 f21e06b / 3d39676
 - [x] Agent 新增模块及测试提交 847ea2a，Blob SHA 与本地一致
 - [ ] Java Maven 编译、共享黄金向量 Java 实测、真实 V5 MySQL 原子性/并发/回滚验收
-- [ ] 真实 PostgreSQL 迁移及 GitHub CI 验收；真实 LLM / Stone 跨服务联调
+- [x] GitHub CI 独立 PostgreSQL 16 全新库迁移及集成回归（296 passed）
+- [ ] 真实 LLM / Stone 跨服务联调及部署目标数据库验收
 - [ ] 企业服务端身份、租户与仓权限、真实审批一次性消耗与有效期、旧写接口访问治理
 - [ ] 固定真实 Workflow、持久 SEND_INTENT 与对账 Worker、可信 NOT_COMMITTED 证明、故障注入及安全写入验收；不得将演练审批升级为生产授权
+
+## v0.9.2 持久化操作故障演练（CI 通过；仅合成环境）
+- [x] 检查上一版本失败及修复日志：显式 HTTPX 依赖、固定兼容版本；修复后两次 CI 通过，296 passed
+- [x] 独立 rehearsal_execution 表、Alembic 0005_rehearsal、SQLite 自动迁移；无真实发送状态
+- [x] 仅合成 FixtureStoneService 和显式启用的内部演练服务可消费审批；真实 HTTP 适配器拒绝
+- [x] 重新核对原只读证据、Hash、工具绑定、READY、审批有效期、申请人和审批人分离
+- [x] 一次性演练审批消费、稳定 operation_id、请求指纹、事务内模拟发送意图和审计事件；消费后不能撤回或重新创建同一演练
+- [x] 独立合成回执写入事务；无实际库存修改、Stone POST、生产写工具、执行 API 或真实派发 Job
+- [x] 内部 once 对账步骤，专用开发维护身份和租户/仓库范围；Lease/Fencing、SKIP LOCKED、旧 Worker 结果拒绝
+- [x] 回执迟到后持久检查点恢复；缺失保持 REHEARSAL_UNKNOWN；最多三次查询，指数退避，耗尽转人工核对提示，不重派
+- [x] 8 项新增 SQLite/离线测试，1 项 PostgreSQL 并发测试；本地分批 299 passed / 6 skipped；GitHub CI 305 passed / 1 warning，6 项 PG 全部通过（45761308366，cd6c23b）
+- [x] 核心 7 个改动文件 Git Blob SHA 一致性核对并提交独立开发分支
+- [ ] Node.js 20 Actions 弃用警告及全量依赖锁定（非阻塞）
+- [ ] 目标部署数据库旧数据增量迁移、实际服务部署及生产运行验收
+- [ ] Stone Maven/V5 MySQL 原子事务和并发/回滚测试；真实企业授权、可信审批及旧写接口访问治理
+- [ ] 真实持久 SEND_INTENT、派发前实时复查、固定写 Workflow、独立只读 HTTP 对账 Worker、可信 NOT_COMMITTED 证明、实际故障注入与人工接管工作台
+- [ ] 真实安全写入验收；演练记录永远不能转换为生产授权或业务提交
 
 ## v1.0 业务交付与生产验收（计划）
 - [ ] 面向仓库/运维岗位的工作台：会话、查询、证据、运行记录、审批（按需）

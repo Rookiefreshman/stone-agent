@@ -29,7 +29,7 @@ class PostgresStore(Store):
         self.driver=psycopg; self.dsn=dsn
         with self.tx() as c:
             row=c.execute('SELECT version_num FROM alembic_version').fetchone()
-            if not row or row[0]!='0004_cancel_drafts': raise RuntimeError('run Alembic upgrade head before starting')
+            if not row or row[0]!='0005_rehearsal': raise RuntimeError('run Alembic upgrade head before starting')
     @contextmanager
     def tx(self):
         with self.driver.connect(self.dsn,connect_timeout=5) as conn:
