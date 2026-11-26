@@ -214,7 +214,7 @@ def evaluate(data,provider=None,repeats=1):
     executed=[r for r in rows if not r.get("skipped")]
     by_category=defaultdict(list)
     for r in rows: by_category[r["category"]].append(r)
-    positives=[r for r in executed if r["expected"]["status"]=="NEEDS_CONFIRMATION"]
+    positives=[r for r in executed if r["expected"].get("status")=="NEEDS_CONFIRMATION"]
     negatives=[r for r in executed if r["expected"].get("status")!="NEEDS_CONFIRMATION"]
     model_positive=[r for r in positives if r["model_requests"]>0]
     tokens=[r["tokens"] for r in executed if r["tokens"] is not None]
