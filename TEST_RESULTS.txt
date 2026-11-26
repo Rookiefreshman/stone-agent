@@ -3,5 +3,5 @@ Base: b9c99457fe0b2ac09d62c627aedc7e24492809c8 (v0.9.9).
 Core: ca8394729cd1443661bed7ea7959b5dd40c6b5d1.
 CI 45774491535: 393 passed, 1 warning, 71.70s; 28 additional localhost HTTP and evaluator tests; PostgreSQL migration and integration, both synthetic reports passed.
 Single-turn fixture 33/44, diagnostic counts MATCHED 33 / FIXTURE_OR_CONTEXT_MISMATCH 11; multi-turn fixture 14/14 scenarios, 30/30 turns, 16 confirmations, 15 completed fixture runs, 17 invocation records; critical proposals 0; live model requests 0. No external model or Stone business HTTP/writes.
-Python warning remains upstream Starlette/AnyIO TestClient alias. Two additional localhost network failure tests (timeout and refused connection) are pending final CI verification.
+Python warning remains upstream Starlette/AnyIO TestClient alias. Two additional localhost network failure tests (timeout and refused connection) passed. Code commit c1b78ee28017ea1aed7ad20a81840d0ac3cab079, push CI 45774817602: 395 passed, 1 warning, 67.56s. Both synthetic metrics unchanged. Documentation-only follow-up CI tracked separately.
 No production identity, approval, write path, tool schema, or migration changes.

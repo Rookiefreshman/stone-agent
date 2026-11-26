@@ -18,3 +18,5 @@ python -m agent.eval_goals --mode fixture --fail-on-critical
 python -m agent.eval_sessions --mode fixture --fail-on-critical
 ```
 真实模型端点由用户在隔离环境自行配置（MODEL_BASE_URL、MODEL_NAME、可选 MODEL_API_KEY），使用原有 --mode live --confirm-isolated-dev。无需提供密钥到聊天或提交仓库。下一步基于实际报告和业务方确认的黄金集优化 Prompt 或校验，不通过放宽确认与授权提高分数。真实 LLM、企业 IAM、生产写入和部署验收仍未完成。
+
+补充网络失败测试后的代码提交 c1b78ee28017ea1aed7ad20a81840d0ac3cab079，[Push CI 45774817602](https://github.com/Rookiefreshman/stone-agent/actions/runs/45774817602) 实测 395 passed / 1 warning，67.56s；相较 v0.9.9 新增30项测试。真实 localhost 读超时和连接拒绝测试通过。单轮与多轮基线仍为33/44、30/30，错误确认0。文档提交的 CI 另行复核。
