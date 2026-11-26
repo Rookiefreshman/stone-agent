@@ -85,11 +85,23 @@ class ReceiptCheckService:
     def _view(self,c,row,cp):
         now=self.store.now(c)
         manual_count=c.execute("SELECT COUNT(*) FROM receipt_check_review WHERE check_id=?",(row["id"],)).fetchone()[0]
+        manual_review=row["state"]=="UNKNOWN" and row["lease_until"]<=now and (bool(row["held"]) or row["attempts"]>=MAX_ATTEMPTS)
+        if row["state"]!="UNKNOWN":
+            readiness="RECEIPT_ALREADY_MATCHED"
+        elif row["lease_until"]>now:
+            readiness="LEASE_ACTIVE"
+        elif not manual_review:
+            readiness="AUTOMATIC_RETRY_PENDING"
+        elif manual_count>=MAX_MANUAL_ATTEMPTS:
+            readiness="MANUAL_BUDGET_EXHAUSTED"
+        else:
+            readiness="MANUAL_RETRY_AVAILABLE"
         return dict(check_id=row["id"],state=row["state"],reference_source="OPERATOR_SUPPLIED",
             expected_source="STONE_HTTP",realm=row["realm"],reference=cp.key.model_dump(),
             dispatch_state="NOT_TRACKED",write_allowed=False,
             attempts=row["attempts"],fence=row["fence"],
-            manual_review=row["state"]=="UNKNOWN" and row["lease_until"]<=now and (bool(row["held"]) or row["attempts"]>=MAX_ATTEMPTS),
+            manual_review=manual_review, lease_until=row["lease_until"],
+            review_readiness=readiness, manual_retry_allowed=readiness=="MANUAL_RETRY_AVAILABLE",
             manual_attempts=manual_count, manual_attempts_remaining=MAX_MANUAL_ATTEMPTS-manual_count,
             last_code=row["last_code"],receipt=cp.receipt.model_dump() if cp.receipt else None,
             evidence_hash=cp.evidence_hash,updated_at=row["updated_at"])
@@ -118,6 +130,12 @@ class ReceiptCheckService:
             out["review_history"]=[dict(r) for r in c.execute("SELECT request_id,expected_fence,fence,actor,reason,created_at FROM receipt_check_review WHERE check_id=? ORDER BY fence",(cid,))]
             return out
 
+    def review_preview(self,cid):
+        """Read-only snapshot. A later retry must still pass the row-lock checks."""
+        with self.store.tx() as c:
+            row,_,cp=self._load(c,cid)
+            return self._view(c,row,cp)
+
     def pending_reviews(self, *, after="", limit=50):
         """Bounded keyset scan; only the configured operator and service realm."""
         if type(limit) is not int or not 1<=limit<=100 or not isinstance(after,str) or len(after)>64:
@@ -134,7 +152,7 @@ class ReceiptCheckService:
                 row,_,cp=self._load(c,candidate["id"])
                 out=self._view(c,row,cp)
                 if out["manual_review"]:
-                    items.append({k:out[k] for k in ("check_id","state","reference","fence","attempts","manual_attempts_remaining","last_code","updated_at")})
+                    items.append({k:out[k] for k in ("check_id","state","reference","fence","attempts","manual_attempts_remaining","review_readiness","manual_retry_allowed","last_code","updated_at")})
             return {"items":items,"next_after":rows[limit-1]["id"] if len(rows)>limit else None}
 
     def manual_retry(self,cid,*,request_id,expected_fence,reason):
@@ -150,11 +168,15 @@ class ReceiptCheckService:
             raise ValueError("invalid review reason")
         with self.store.tx() as c:
             row,key,cp=self._load(c,cid)
-            previous=c.execute("SELECT * FROM receipt_check_review WHERE check_id=? AND request_id=?",(cid,request_id)).fetchone()
+            previous=c.execute("SELECT r.*,a.state AS attempt_state,a.code AS attempt_code,a.evidence_hash AS attempt_evidence_hash FROM receipt_check_review r JOIN receipt_check_attempt a ON a.check_id=r.check_id AND a.fence=r.fence WHERE r.check_id=? AND r.request_id=?",(cid,request_id)).fetchone()
             if previous:
                 if previous["expected_fence"]!=expected_fence or previous["reason"]!=reason:
                     raise Conflict("REVIEW_REQUEST_CONFLICT")
-                return dict(self._view(c,row,cp),review_request_id=request_id,review_fence=previous["fence"],replayed=True)
+                status=previous["attempt_state"]
+                if status=="CLAIMED" and row["lease_until"]<=self.store.now(c):
+                    status="LEASE_EXPIRED"
+                return dict(self._view(c,row,cp),review_request_id=request_id,review_fence=previous["fence"],replayed=True,
+                    review_attempt_status=status,review_code=previous["attempt_code"],review_evidence_hash=previous["attempt_evidence_hash"])
             now=self.store.now(c)
             if row["fence"]!=expected_fence:
                 raise Conflict("REVIEW_FENCE_CHANGED")
@@ -170,7 +192,9 @@ class ReceiptCheckService:
             c.execute("INSERT INTO receipt_check_review(check_id,request_id,expected_fence,fence,actor,reason,created_at) VALUES(?,?,?,?,?,?,?)",
                 (cid,request_id,expected_fence,fence,self.principal.actor,reason,now))
         obs=self.reader.query(self.principal,key)
-        return dict(self._finish(cid,fence,obs),review_request_id=request_id,review_fence=fence,replayed=False)
+        out=self._finish(cid,fence,obs)
+        return dict(out,review_request_id=request_id,review_fence=fence,replayed=False,
+            review_attempt_status="OBSERVED",review_code=obs.code,review_evidence_hash=out["evidence_hash"])
 
     def _claim(self,lease=30):
         if not 1<=lease<=120:
@@ -251,6 +275,8 @@ def main():
     add.add_argument("--fingerprint",required=True)
     view=sub.add_parser("status")
     view.add_argument("check_id")
+    preview=sub.add_parser("review-preview")
+    preview.add_argument("check_id")
     sub.add_parser("once")
     pending=sub.add_parser("pending-reviews")
     pending.add_argument("--after",default="")
@@ -267,6 +293,8 @@ def main():
             operation_id=args.operation_id,request_fingerprint=args.fingerprint))
     elif args.action=="status":
         out=service.view(args.check_id)
+    elif args.action=="review-preview":
+        out=service.review_preview(args.check_id)
     elif args.action=="pending-reviews":
         out=service.pending_reviews(after=args.after,limit=args.limit)
     elif args.action=="review-retry":
