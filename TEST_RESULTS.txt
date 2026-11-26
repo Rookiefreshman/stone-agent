@@ -1,10 +1,7 @@
-Stone Agent v0.9.9 multi-turn session evaluation
-Base: v0.9.8 branch commit ce285f323521ef65908cf7aec4dbf6355ca73a7a.
-Branch: agent/multiturn-evaluation-v0.9.9.
-Core code commit: 19b078559355d236e43f419db93ca7a10ba7af51.
-Core CI: 45770395968 — 365 passed, 1 warning, 54.48s. PostgreSQL migrations/integration and both evaluation artifacts uploaded.
-Multi-turn fixture gold: 14/14 scenarios, 30/30 turns exact; 16 explicit local confirmations; 15 completed local fixture runs; 17 durable business-query invocation records; zero false/wrong confirmations; 0 runtime model calls; 0 live model requests; 0 Stone HTTP calls; 0 Stone business writes. Local propose latency P50/P95 2.215/12.165 ms, not LLM latency.
-Actions upgraded to checkout@v6, setup-python@v6, upload-artifact@v6 (Node 24), removing Node 20 runtime warnings. One upstream Starlette/AnyIO DeprecationWarning remains and is tracked separately.
-Initial draft CI failed twice due evaluator metrics assuming error expectations contain a status; fixed, full regression passed. A later accounting correction uses durable invocation ledger to count history-receipt steps.
-No changes to Stone repository, APIs, database schema, or production write path. Real model endpoint not configured; no live LLM score claimed.
-Documentation commit CI is tracked separately.
+Stone Agent v0.9.10 model HTTP contract
+Base: b9c99457fe0b2ac09d62c627aedc7e24492809c8 (v0.9.9).
+Core: ca8394729cd1443661bed7ea7959b5dd40c6b5d1.
+CI 45774491535: 393 passed, 1 warning, 71.70s; 28 additional localhost HTTP and evaluator tests; PostgreSQL migration and integration, both synthetic reports passed.
+Single-turn fixture 33/44, diagnostic counts MATCHED 33 / FIXTURE_OR_CONTEXT_MISMATCH 11; multi-turn fixture 14/14 scenarios, 30/30 turns, 16 confirmations, 15 completed fixture runs, 17 invocation records; critical proposals 0; live model requests 0. No external model or Stone business HTTP/writes.
+Python warning remains upstream Starlette/AnyIO TestClient alias. Two additional localhost network failure tests (timeout and refused connection) passed. Code commit c1b78ee28017ea1aed7ad20a81840d0ac3cab079, push CI 45774817602: 395 passed, 1 warning, 67.56s. Both synthetic metrics unchanged. Documentation-only follow-up CI tracked separately.
+No production identity, approval, write path, tool schema, or migration changes.
