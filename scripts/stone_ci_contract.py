@@ -137,6 +137,35 @@ def verify(receipt_task, operation_id, history_task, query_token, receipt_token)
     else:
         raise RuntimeError("OUTBOUND_AUTH_NOT_ENFORCED")
     checks.append("local_and_server_read_authorization")
+
+    # Managed-session natural-language fixture grammar -> typed confirmation ->
+    # existing real read-only runtime. This is not an external LLM evaluation.
+    from agent.session import SessionService
+    from agent.runtime import Runtime
+    from agent.provider import FixtureProvider
+    from agent.store import RULES
+    from agent.tools import make_registry
+    from agent.business_language import DEEP,OUT,WES
+    with tempfile.TemporaryDirectory() as folder:
+        store=Store(str(Path(folder)/"language.sqlite"),RULES)
+        model=FixtureProvider()
+        runtime=Runtime(store,model,make_registry(service))
+        session=SessionService(store)
+        examples=[
+            (f"诊断仓库403任务{history_task}历史回执",DEEP,StockWorkArgs(warehouse_id=403,task_id=history_task)),
+            ("分析仓库97001出库单97001分配失败",OUT,OutboundArgs(warehouse_id=97001,order_id=97001)),
+            ("诊断仓库98001设备a请求8个任务的调度容量",WES,WesArgs(warehouse_id=98001,device_code="a",requested_limit=8)),
+        ]
+        for message,kind,expected in examples:
+            sid=session.create(p)["session_id"]
+            proposal=session.propose(p,sid,"ci-language",message)
+            require(proposal["status"]=="NEEDS_CONFIRMATION" and proposal["goal_kind"]==kind and proposal["candidate"]==expected.model_dump(),"TYPED_LANGUAGE_PROPOSAL")
+            rid=session.confirm(p,sid,proposal["proposal_id"],expected,kind)["run_id"]
+            result=runtime.advance(p,rid)
+            audit=store.inspect(p,rid)
+            require(result["state"]=="COMPLETED" and not audit["attempts"] and all(i["origin"]=="RULE" and i["state"]=="SUCCEEDED" for i in audit["invocations"]) and len(audit["invocations"])==(2 if kind==DEEP else 1),"TYPED_LANGUAGE_EXECUTION")
+        require(model.calls==0,"UNNECESSARY_MODEL_CALL")
+    checks.append("managed_language_confirmation_to_actual_read_only_tools")
     return {"environment": "DISPOSABLE_STONE_CI", "checks": checks, "write_allowed": False, "business_posts": 0}
 
 def main():

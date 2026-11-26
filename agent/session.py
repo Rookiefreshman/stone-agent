@@ -8,6 +8,7 @@ from .contracts import (StockWorkArgs, GoalContract, Forbidden, Conflict,
                         canonical, digest, strict_json, ModelAttemptError)
 from .goal_proposal import propose, GRAMMAR
 from .tools import authorize
+from .business_language import EXTENDED, extended_followup
 from .store import TERMINAL
 
 FOLLOW_TASK = re.compile(r'(?:那|那么|再查|再查询|再看|接着查)\s*(?:任务|库存作业|库存任务)?\s*([0-9]{1,19})\s*号?\s*(?:任务|库存作业|库存任务)?\s*(?:呢|的状态|的流水|的状态及流水)?\s*[。？?]?')
@@ -52,7 +53,9 @@ class SessionService:
         rows=c.execute('SELECT state FROM run WHERE tenant=? AND actor=? AND session=?',(p.tenant,p.actor,sid))
         return any(r['state'] not in TERMINAL for r in rows)
 
-    def _derive(self,message,p,confirmed,pending):
+    def _derive(self,message,p,confirmed,pending,extended_confirmed=None,extended_pending=None):
+        extended=extended_followup(message,p,extended_confirmed,extended_pending)
+        if extended is not None: return extended
         # Only tightly matched follow-up patterns can inherit fields. Never let
         # arbitrary LLM output or a previous tool result change entity memory.
         m=FOLLOW_TASK.fullmatch(message.strip())
@@ -107,15 +110,23 @@ class SessionService:
             if self._active(c,p,sid): raise Conflict('ACTIVE_RUN')
             prev=c.execute('SELECT * FROM goal_proposal WHERE session_id=? AND revision=?',(sid,s['revision'])).fetchone()
             pending=None
+            extended_pending=None
+            extended_confirmed=None
             if prev and prev['state']=='NEEDS_INPUT' and prev['expires_at']>now:
-                pending=strict_json(prev['result']).get('candidate')
+                prior=strict_json(prev['result'])
+                if prior.get('goal_kind') in EXTENDED: extended_pending=prior
+                else: pending=prior.get('candidate')
             # A newer unconfirmed/unsupported turn must not silently fall back
             # to a potentially different older warehouse.
             confirmed=strict_json(s['confirmed_entity']) if s['confirmed_entity'] and prev is None else None
             if confirmed and s['confirmed_proposal_id']:
                 cp=c.execute('SELECT result FROM goal_proposal WHERE id=? AND session_id=?',(s['confirmed_proposal_id'],sid)).fetchone()
-                if cp and strict_json(cp['result']).get('goal_kind','READ_STOCK_WORK')!='READ_STOCK_WORK':
-                    confirmed=None
+                if cp:
+                    prior=strict_json(cp['result'])
+                    if prior.get('goal_kind') in EXTENDED and prior.get('candidate')==confirmed:
+                        extended_confirmed=prior
+                    if prior.get('goal_kind','READ_STOCK_WORK')!='READ_STOCK_WORK':
+                        confirmed=None
             rev=s['revision']+1
             c.execute('UPDATE agent_session SET revision=? WHERE id=?',(rev,sid))
             c.execute("UPDATE goal_proposal SET state='SUPERSEDED' WHERE session_id=? AND state IN ('PENDING','NEEDS_INPUT','NEEDS_CONFIRMATION')",(sid,))
@@ -123,7 +134,7 @@ class SessionService:
         # Model call outside SQLite transaction. Request is durably reserved;
         # crashed/late attempts are not replayed under the same request key.
         try:
-            result=self._derive(message,p,confirmed,pending)
+            result=self._derive(message,p,confirmed,pending,extended_confirmed,extended_pending)
         except Forbidden:
             result={'status':'FORBIDDEN','source':'POLICY','candidate':None,'message':'无权访问。'}
         except (ValueError,ModelAttemptError):
@@ -152,7 +163,7 @@ class SessionService:
             goal=GoalContract(kind=kind,entity=entity,provenance='CONFIRMED_STRUCTURED_INPUT')
             # The execution prompt contains only the user-confirmed, single goal.
             # Original user message remains in the proposal audit record.
-            message=f'已确认 {kind} 仓库{entity.warehouse_id}任务{entity.task_id}（只读）'
+            message=f'已确认 {kind} {canonical(entity.model_dump())}（只读）' if kind in EXTENDED else f'已确认 {kind} 仓库{entity.warehouse_id}任务{entity.task_id}（只读）'
             rid=self.store.submit_in_tx(c,p,sid,'proposal:'+pid,message,goal)
             c.execute("UPDATE goal_proposal SET state='CONFIRMED',run_id=? WHERE id=?",(rid,pid))
             c.execute('UPDATE agent_session SET revision=revision+1,confirmed_entity=?,confirmed_proposal_id=? WHERE id=?',(canonical(entity.model_dump()),pid,sid))

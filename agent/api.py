@@ -6,7 +6,7 @@ from .store import TERMINAL
 from .contracts import canonical
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
-from .contracts import Principal,GoalContract,StockWorkArgs,Forbidden,Conflict,LostClaim
+from .contracts import Principal,GoalContract,StockWorkArgs,OutboundArgs,WesArgs,Forbidden,Conflict,LostClaim
 from .tools import authorize
 from .main import build
 from .goal_proposal import propose
@@ -29,8 +29,8 @@ class SessionPropose(Propose):
 
 class Confirm(BaseModel):
     model_config=ConfigDict(extra='forbid',strict=True)
-    entity: StockWorkArgs
-    kind: Literal['READ_STOCK_WORK','DIAGNOSE_STOCK_WORK','ANALYZE_STOCK_WORK']='READ_STOCK_WORK'
+    entity: StockWorkArgs | OutboundArgs | WesArgs
+    kind: Literal['READ_STOCK_WORK','DIAGNOSE_STOCK_WORK','ANALYZE_STOCK_WORK','DEEP_DIAGNOSE_STOCK_WORK','DIAGNOSE_OUTBOUND_ALLOCATION','DIAGNOSE_WES_DISPATCH']='READ_STOCK_WORK'
 
 
 def create_app():
