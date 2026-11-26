@@ -6,6 +6,7 @@ dispatch record. No business POST, model tool, API route, or rehearsal conversio
 import argparse
 import json
 import os
+import re
 import urllib.parse
 import uuid
 
@@ -34,6 +35,15 @@ CHECK_DDL = (
 )
 
 MAX_ATTEMPTS = 3
+MAX_MANUAL_ATTEMPTS = 2
+CHECK_DDL += (
+    """CREATE TABLE IF NOT EXISTS receipt_check_review (
+        check_id TEXT NOT NULL REFERENCES receipt_check(id),
+        request_id TEXT NOT NULL, expected_fence BIGINT NOT NULL, fence BIGINT NOT NULL,
+        actor TEXT NOT NULL, reason TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL,
+        PRIMARY KEY(check_id,request_id), UNIQUE(check_id,fence),
+        FOREIGN KEY(check_id,fence) REFERENCES receipt_check_attempt(check_id,fence))""",
+)
 OPERATOR = "local-receipt-operator"
 
 
@@ -74,11 +84,13 @@ class ReceiptCheckService:
 
     def _view(self,c,row,cp):
         now=self.store.now(c)
+        manual_count=c.execute("SELECT COUNT(*) FROM receipt_check_review WHERE check_id=?",(row["id"],)).fetchone()[0]
         return dict(check_id=row["id"],state=row["state"],reference_source="OPERATOR_SUPPLIED",
             expected_source="STONE_HTTP",realm=row["realm"],reference=cp.key.model_dump(),
             dispatch_state="NOT_TRACKED",write_allowed=False,
             attempts=row["attempts"],fence=row["fence"],
-            manual_review=row["state"]=="UNKNOWN" and (bool(row["held"]) or row["attempts"]>=MAX_ATTEMPTS and row["lease_until"]<=now),
+            manual_review=row["state"]=="UNKNOWN" and row["lease_until"]<=now and (bool(row["held"]) or row["attempts"]>=MAX_ATTEMPTS),
+            manual_attempts=manual_count, manual_attempts_remaining=MAX_MANUAL_ATTEMPTS-manual_count,
             last_code=row["last_code"],receipt=cp.receipt.model_dump() if cp.receipt else None,
             evidence_hash=cp.evidence_hash,updated_at=row["updated_at"])
 
@@ -103,7 +115,62 @@ class ReceiptCheckService:
             row,_,cp=self._load(c,cid)
             out=self._view(c,row,cp)
             out["attempt_history"]=[dict(r) for r in c.execute("SELECT fence,state,claimed_at,finished_at,code,evidence_hash FROM receipt_check_attempt WHERE check_id=? ORDER BY fence",(cid,))]
+            out["review_history"]=[dict(r) for r in c.execute("SELECT request_id,expected_fence,fence,actor,reason,created_at FROM receipt_check_review WHERE check_id=? ORDER BY fence",(cid,))]
             return out
+
+    def pending_reviews(self, *, after="", limit=50):
+        """Bounded keyset scan; only the configured operator and service realm."""
+        if type(limit) is not int or not 1<=limit<=100 or not isinstance(after,str) or len(after)>64:
+            raise ValueError("invalid review page")
+        p=self.principal
+        warehouses=sorted(p.warehouses)
+        placeholders=",".join("?" for _ in warehouses)
+        with self.store.tx() as c:
+            now=self.store.now(c)
+            rows=c.execute("SELECT id FROM receipt_check WHERE tenant=? AND actor=? AND realm=? AND binding_hash=? AND warehouse_id IN ("+placeholders+") AND id>? AND state='UNKNOWN' AND lease_until<=? AND (held=1 OR attempts>=?) ORDER BY id LIMIT ?",
+                (p.tenant,p.actor,self.realm,self.binding,*warehouses,after,now,MAX_ATTEMPTS,limit+1)).fetchall()
+            items=[]
+            for candidate in rows[:limit]:
+                row,_,cp=self._load(c,candidate["id"])
+                out=self._view(c,row,cp)
+                if out["manual_review"]:
+                    items.append({k:out[k] for k in ("check_id","state","reference","fence","attempts","manual_attempts_remaining","last_code","updated_at")})
+            return {"items":items,"next_after":rows[limit-1]["id"] if len(rows)>limit else None}
+
+    def manual_retry(self,cid,*,request_id,expected_fence,reason):
+        """Consume exactly one explicitly requested GET attempt, never re-enable auto retry.
+        Replay reports current status, not another GET. The local operator is trusted
+        by deployment; this is neither a business approval nor an enterprise identity.
+        """
+        if not isinstance(request_id,str) or not re.fullmatch(r"[A-Za-z0-9._:-]{1,64}",request_id):
+            raise ValueError("invalid review request id")
+        if type(expected_fence) is not int or not 0<=expected_fence<=9223372036854775807:
+            raise ValueError("invalid expected fence")
+        if not isinstance(reason,str) or not reason.strip() or len(reason)>240 or not reason.isprintable():
+            raise ValueError("invalid review reason")
+        with self.store.tx() as c:
+            row,key,cp=self._load(c,cid)
+            previous=c.execute("SELECT * FROM receipt_check_review WHERE check_id=? AND request_id=?",(cid,request_id)).fetchone()
+            if previous:
+                if previous["expected_fence"]!=expected_fence or previous["reason"]!=reason:
+                    raise Conflict("REVIEW_REQUEST_CONFLICT")
+                return dict(self._view(c,row,cp),review_request_id=request_id,review_fence=previous["fence"],replayed=True)
+            now=self.store.now(c)
+            if row["fence"]!=expected_fence:
+                raise Conflict("REVIEW_FENCE_CHANGED")
+            out=self._view(c,row,cp)
+            if not out["manual_review"]:
+                raise Conflict("REVIEW_NOT_AVAILABLE")
+            if out["manual_attempts_remaining"]<=0:
+                raise Conflict("MANUAL_REVIEW_BUDGET_EXHAUSTED")
+            fence=row["fence"]+1
+            c.execute("UPDATE receipt_check_attempt SET state='ABANDONED',finished_at=?,code='LEASE_EXPIRED' WHERE check_id=? AND state='CLAIMED'",(now,cid))
+            c.execute("UPDATE receipt_check SET attempts=attempts+1,fence=?,held=1,lease_until=?,updated_at=?,last_code='MANUAL_READ_CLAIMED' WHERE id=?",(fence,now+30,now,cid))
+            c.execute("INSERT INTO receipt_check_attempt(check_id,fence,state,claimed_at) VALUES(?,?,'CLAIMED',?)",(cid,fence,now))
+            c.execute("INSERT INTO receipt_check_review(check_id,request_id,expected_fence,fence,actor,reason,created_at) VALUES(?,?,?,?,?,?,?)",
+                (cid,request_id,expected_fence,fence,self.principal.actor,reason,now))
+        obs=self.reader.query(self.principal,key)
+        return dict(self._finish(cid,fence,obs),review_request_id=request_id,review_fence=fence,replayed=False)
 
     def _claim(self,lease=30):
         if not 1<=lease<=120:
@@ -134,7 +201,8 @@ class ReceiptCheckService:
             cp=cp.apply(obs)
             state="RECEIPT_MATCHED" if cp.state=="COMMITTED" else "UNKNOWN"
             retryable=obs.code in ("RECEIPT_NOT_OBSERVED","RECEIPT_UNVERIFIED","RECEIPT_HTTP_429") or obs.code.startswith("RECEIPT_HTTP_5")
-            held=int(state=="UNKNOWN" and not retryable)
+            manual=c.execute("SELECT 1 FROM receipt_check_review WHERE check_id=? AND fence=?",(cid,fence)).fetchone() is not None
+            held=int(state=="UNKNOWN" and (manual or not retryable))
             n=c.execute("UPDATE receipt_check_attempt SET state='OBSERVED',finished_at=?,code=?,evidence_hash=? WHERE check_id=? AND fence=? AND state='CLAIMED'",(now,obs.code,cp.evidence_hash,cid,fence)).rowcount
             if n!=1:
                 raise Conflict("RECEIPT_ATTEMPT_MISSING")
@@ -184,6 +252,14 @@ def main():
     view=sub.add_parser("status")
     view.add_argument("check_id")
     sub.add_parser("once")
+    pending=sub.add_parser("pending-reviews")
+    pending.add_argument("--after",default="")
+    pending.add_argument("--limit",type=int,default=50)
+    retry=sub.add_parser("review-retry")
+    retry.add_argument("check_id")
+    retry.add_argument("--request-id",required=True)
+    retry.add_argument("--expected-fence",type=int,required=True)
+    retry.add_argument("--reason",required=True)
     args=parser.parse_args()
     service=configured_service()
     if args.action=="register":
@@ -191,6 +267,10 @@ def main():
             operation_id=args.operation_id,request_fingerprint=args.fingerprint))
     elif args.action=="status":
         out=service.view(args.check_id)
+    elif args.action=="pending-reviews":
+        out=service.pending_reviews(after=args.after,limit=args.limit)
+    elif args.action=="review-retry":
+        out=service.manual_retry(args.check_id,request_id=args.request_id,expected_fence=args.expected_fence,reason=args.reason)
     else:
         out=service.once()
     print(json.dumps(out,ensure_ascii=False))
