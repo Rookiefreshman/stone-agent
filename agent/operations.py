@@ -154,6 +154,7 @@ class OperationService:
     def withdraw(self,p,oid):
         with self.store.tx() as c:
             row,_=self._load(c,p,oid)
+            if c.execute('SELECT operation_id FROM rehearsal_execution WHERE operation_id=?',(oid,)).fetchone(): raise Conflict('REHEARSAL_ALREADY_CONSUMED')
             if row['state']=='WITHDRAWN': return self._view(c,row)
             if row['state'] not in ('AWAITING_REVIEW','REHEARSAL_APPROVED') or self.store.now(c)>=row['expires_at']:
                 raise Conflict('DRAFT_NOT_WITHDRAWABLE')
