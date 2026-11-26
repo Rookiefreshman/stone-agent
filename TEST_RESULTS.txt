@@ -1,7 +1,10 @@
 Stone Agent v0.9.9 multi-turn session evaluation
 Base: v0.9.8 branch commit ce285f323521ef65908cf7aec4dbf6355ca73a7a.
-New branch: agent/multiturn-evaluation-v0.9.9.
-Changes: 14 synthetic multi-turn scenarios, 30 user turns, evaluator reuses SessionService and local SQLite + FixtureStoneService. No real Stone HTTP or business writes. Explicit confirmation only after exact expected match; mismatch aborts scenario.
-Workflow actions updated checkout@v6, setup-python@v6, upload-artifact@v6 (Node 24). Python TestClient warning remains upstream: Starlette 0.50.0 uses deprecated AnyIO alias; no warning suppression or dependency downgrade.
-Earlier CI on initial draft failed 2 evaluator tests due an expected ACTIVE_RUN error shape not containing status; fixed by normalizing optional status. Latest verified prior evaluator: 365 passed, 1 warning, 14/14 scenarios, 30/30 turns, 0 critical proposal errors; this run preceded the final invocation-ledger accounting correction. Final HEAD CI 45770395968 pending at documentation time.
+Branch: agent/multiturn-evaluation-v0.9.9.
+Core code commit: 19b078559355d236e43f419db93ca7a10ba7af51.
+Core CI: 45770395968 — 365 passed, 1 warning, 54.48s. PostgreSQL migrations/integration and both evaluation artifacts uploaded.
+Multi-turn fixture gold: 14/14 scenarios, 30/30 turns exact; 16 explicit local confirmations; 15 completed local fixture runs; 17 durable business-query invocation records; zero false/wrong confirmations; 0 runtime model calls; 0 live model requests; 0 Stone HTTP calls; 0 Stone business writes. Local propose latency P50/P95 2.215/12.165 ms, not LLM latency.
+Actions upgraded to checkout@v6, setup-python@v6, upload-artifact@v6 (Node 24), removing Node 20 runtime warnings. One upstream Starlette/AnyIO DeprecationWarning remains and is tracked separately.
+Initial draft CI failed twice due evaluator metrics assuming error expectations contain a status; fixed, full regression passed. A later accounting correction uses durable invocation ledger to count history-receipt steps.
 No changes to Stone repository, APIs, database schema, or production write path. Real model endpoint not configured; no live LLM score claimed.
+Documentation commit CI is tracked separately.

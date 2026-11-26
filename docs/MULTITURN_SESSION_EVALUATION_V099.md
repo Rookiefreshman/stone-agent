@@ -120,7 +120,13 @@ GitHub Actions 更新至 `actions/checkout@v6`、`actions/setup-python@v6`、`ac
 
 当前保留一条 Python 上游依赖警告：FastAPI 0.128.2 约束 Starlette `<0.51.0`，仓库使用 Starlette 0.50.0；AnyIO 4.15 将 `anyio.abc.BlockingPortal` 标记为弃用，而该 Starlette TestClient 版本仍使用该别名。Starlette 上游已在后续 1.x 版本修复（#3498），但这需要 FastAPI、Starlette 和 TestClient 底层 HTTP 客户端的协同升级。当前不通过过滤 warning、任意降级 AnyIO 或直接引入 Alpha 版本掩盖问题。单独建立依赖升级任务，完成全部 API/HTTP 契约测试后再合并。
 
-## 8. 验收边界及下一步
+## 8. 实测基线
+
+核心代码 CI：365 passed，1 warning，54.48s（[run 45770395968](https://github.com/Rookiefreshman/stone-agent/actions/runs/45770395968)）。14/14 场景、30/30 回合完整匹配；16次显式本地确认，15个 Fixture Run 完成，17条持久化业务查询 invocation；错误可确认候选0、Runtime 模型调用0、模型提议请求0、Stone HTTP 调用0、Stone 业务写入0。P50/P95 为2.215/12.165ms，是本地 SessionService 提议回合延迟，不是 LLM 延迟。CI 上传 `multi-turn-session-fixture-baseline` 工件。
+
+该基线证明当前受限 Fixture 和 SessionService 符合这14个合成契约，不证明真实 LLM 准确率，也不证明客户业务流程已经验收。
+
+## 9. 验收边界及下一步
 
 本阶段只新增评测数据、评测 Runner、自动化测试、CI artifact 与文档；不修改 SessionService、业务工具注册、Stone API、Stone 数据库 schema、Agent Alembic 版本或生产写入路径。合成 Fixture 全通过仅说明当前代码符合这14个手工定义的会话契约，不代表真实 LLM 具备相同准确率，也不代表业务人员认可所有上下文继承策略。
 

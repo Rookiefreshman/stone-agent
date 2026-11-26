@@ -257,8 +257,10 @@
 - [x] 模型模式复用 ChatCompatibleProvider；只对未被受限规则处理的自然语言轮次请求模型；模型候选与平台最终结果分开记录；错误/不匹配时中止场景，不确认错误目标。
 - [x] 统计 turn/scenario exact、错误确认、澄清与上下文隔离、真实模型请求与 Token 覆盖、P50/P95、重复稳定性；从持久 invocation ledger 统计 Fixture 调用，避免漏计历史回执步骤。
 - [x] CI Actions 更新至 checkout@v6 / setup-python@v6 / upload-artifact@v6（Node 24），并上传多轮会话 fixture 基线；Node 20 弃用警告已消除。
-- [ ] v0.9.9 最终 HEAD 全量 CI 验收（当前运行 45770395968）。
+- [x] v0.9.9 核心代码最终 CI 365 passed，1 warning，54.48s（45770395968）；SQLite/PG 回归及双评测 artifact 上传成功。文档提交后的 CI 另行复核。
+- [x] Node.js 20 Actions 弃用告警已通过 checkout@v6 / setup-python@v6 / upload-artifact@v6（Node 24）消除。
 - [ ] Python TestClient DeprecationWarning：当前 FastAPI 0.128.2 将 Starlette 限制为 <0.51，Starlette 0.50.0 调用 AnyIO 4.15 已弃用别名；上游修复位于 Starlette 1.x，需单独进行 FastAPI/Starlette/httpx2 兼容升级与完整 HTTP 契约回归，不通过屏蔽 warning 或降级 AnyIO 掩盖。
+- [x] 多轮 Fixture 基线：14/14 场景、30/30 回合完整匹配；16 次本地确认、15 个 Fixture Run 完成、17 条业务查询 invocation，错误确认0；模型请求0，Stone HTTP/写入0（45770395968）。
 - [ ] 真实模型端点、真实多轮 LLM 评测及失败样例归因；当前未配置模型服务，不把 Fixture 结果称为 LLM 准确率。
 - [ ] 仓储业务人员审核会话黄金集，确认澄清策略、同类型继承与撤权行为是否符合实际岗位工作流。
 - [ ] 生产身份、企业授权、真实审批、可信发送账本、真实写入仍为独立专项；本轮没有 Stone 业务代码、API 或数据库 schema 变化。
