@@ -1,6 +1,4 @@
-v0.9.4 verification (2026-11-26)
-Prior final Agent v0.9.3: 305 passed, 1 warning (run 45762570378).
-Prior final Stone v0.9.3: success (run 45762564734).
-Stone v0.9.4 707c249: run 45763151336, MySQL 5.7 and 8.0 each 45 Java tests, 0 failures/errors/skipped (25 unit, 20 integration); V1-V6 applied on empty disposable database; six actual HTTP groups passed in each matrix job.
-New tests: 4 Java unit + 3 MySQL integration; cross-warehouse duplicate approval and transaction rollback, validity boundary, missing grant and revoked access. Test policy only.
-Agent runtime and schema unchanged; no actual business POST or production authorization. Target populated V5 migration, IAM, real LLM and production dispatch unverified.
+v0.9.5 CI verification (2026-11-26)
+Agent core 9a575f1: 317 passed, 1 warning in 45.04s (45763923739); 12 new, 7 PostgreSQL integration cases included.
+Stone CI ed4331e (45763988260): MySQL 5.7 and 8.0 each 45 Java tests, 0 failures/errors/skips, 7 real HTTP contract groups. Read result loss injected after GET, lease expiry simulated, fresh subprocess recovers matching receipt. Selected business counts and balances unchanged; no business POST.
+No production IAM, actual write dispatch, actual submit response loss, target database migration or production acceptance tested.
