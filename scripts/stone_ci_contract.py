@@ -6,6 +6,10 @@ The Stone workflow supplies only identifiers from its actual Java integration te
 import argparse
 import json
 import os
+import tempfile
+import subprocess
+import sys
+from pathlib import Path
 
 from agent.contracts import Principal, StockWorkArgs, StockWorkResult, DispatchHistory, Forbidden, DomainReadError
 from agent.integrations.outbound import OutboundArgs, OutboundResult, analyze as outbound_analyze
@@ -66,6 +70,38 @@ def verify(receipt_task, operation_id, history_task, query_token, receipt_token)
     require(missing.status == "UNKNOWN" and missing.code == "RECEIPT_NOT_OBSERVED", "RECEIPT_MISSING")
     require(cp.apply(missing) == cp, "COMMITTED_STICKY")
     checks.append("real_receipt_fingerprint_missing_and_sticky")
+
+    # Persist an independently supplied reference; read actual Stone HTTP receipt,
+    # lose the first result before persisting it, then recover in a fresh process.
+    from agent.store import Store
+    from agent.receipt_check import ReceiptCheckService, OPERATOR
+    with tempfile.TemporaryDirectory() as folder:
+        db=str(Path(folder)/"receipt-check.sqlite")
+        store=Store(db)
+        operator=Principal("test",OPERATOR,frozenset({99101}))
+        journal=ReceiptCheckService(store,operator,ORIGIN,receipt_token,"stone-disposable-ci",enabled=True)
+        cid=journal.register(key)["check_id"]
+        def crash():
+            raise RuntimeError("CI_INJECTED_AFTER_GET")
+        try:
+            journal.once(after_read=crash)
+        except RuntimeError as exc:
+            require(str(exc)=="CI_INJECTED_AFTER_GET","RECEIPT_UNEXPECTED_FAILURE")
+        else:
+            raise RuntimeError("RECEIPT_CRASH_NOT_INJECTED")
+        require(journal.view(cid)["state"]=="UNKNOWN","RECEIPT_PREMATURE_MATCH")
+        with store.tx() as c:
+            c.execute("UPDATE receipt_check SET lease_until=0 WHERE id=?",(cid,))
+        env=dict(os.environ,STONE_RECEIPT_CHECK_ENABLED="1",STONE_RECEIPT_TENANT="test",
+            STONE_RECEIPT_WAREHOUSES="99101",STONE_RECEIPT_ORIGIN=ORIGIN,
+            STONE_RECEIPT_TOKEN=receipt_token,STONE_RECEIPT_REALM="stone-disposable-ci",POC_DB=db)
+        env.pop("AGENT_DATABASE_URL",None)
+        result=subprocess.run([sys.executable,"-m","agent.receipt_check","once"],env=env,check=True,capture_output=True,text=True,timeout=30)
+        recovered=json.loads(result.stdout)
+        require(recovered["state"]=="RECEIPT_MATCHED" and recovered["attempts"]==2 and recovered["dispatch_state"]=="NOT_TRACKED" and not recovered["write_allowed"],"DURABLE_RECEIPT_RECOVERY")
+        history=journal.view(cid)["attempt_history"]
+        require([x["state"] for x in history]==["ABANDONED","OBSERVED"],"RECEIPT_ATTEMPT_AUDIT")
+    checks.append("durable_receipt_recovery_after_read_result_loss")
 
     # Local data-domain denial, and independent server-side receipt reader scope.
     try:

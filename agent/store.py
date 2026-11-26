@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from .contracts import canonical, digest, strict_json, Conflict, LostClaim, Forbidden
 from .operations import OP_DDL
 from .rehearsal import REHEARSAL_DDL
+from .receipt_check import CHECK_DDL
 
 DDL='''
 CREATE TABLE IF NOT EXISTS agent_session (
@@ -79,7 +80,7 @@ class Store:
                     OR (origin='RULE' AND request_id IS NULL AND provider_call_id IS NULL AND direct_snapshot IS NOT NULL)))""")
                 c.execute("INSERT INTO invocation SELECT *, 'MODEL', NULL FROM invocation_v05")
                 c.execute('DROP TABLE invocation_v05')
-            for stmt in OP_DDL + REHEARSAL_DDL: c.execute(stmt)
+            for stmt in OP_DDL + REHEARSAL_DDL + CHECK_DDL: c.execute(stmt)
     @contextmanager
     def tx(self):
         c=sqlite3.connect(self.path,timeout=5,isolation_level=None); c.row_factory=sqlite3.Row
