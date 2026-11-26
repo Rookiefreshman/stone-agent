@@ -103,3 +103,10 @@ def test_api_typed_confirmation(tmp_path,monkeypatch):
     res=c.post(url+'/'+r['proposal_id']+'/confirm',headers=h,json={'entity':r['candidate'],'kind':r['goal_kind']})
     assert res.status_code==202
     assert c.post('/api/v1/runs/'+res.json()['run_id']+'/advance',headers=h).json()['state']=='COMPLETED'
+
+def test_model_cannot_downgrade_or_drop_compound():
+    model=Provider(turn('{"kind":"READ_STOCK_WORK","warehouse_id":1,"task_id":201}'))
+    assert propose(CASES[1][0],P,model)['status']=='UNSUPPORTED'
+    model=Provider(turn('{"kind":"DIAGNOSE_OUTBOUND_ALLOCATION","warehouse_id":1,"order_id":201}'))
+    assert propose('分析仓库1出库单201分配失败然后重新分配',P,model)['status']=='UNSUPPORTED'
+    assert propose('分析仓库1出库单201及出库单202分配失败',P,model)['status']=='UNSUPPORTED'
