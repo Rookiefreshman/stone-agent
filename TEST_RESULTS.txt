@@ -1,4 +1,4 @@
-v0.9.5 CI verification (2026-11-26)
-Agent core 9a575f1: 317 passed, 1 warning in 45.04s (45763923739); 12 new, 7 PostgreSQL integration cases included.
-Stone CI ed4331e (45763988260): MySQL 5.7 and 8.0 each 45 Java tests, 0 failures/errors/skips, 7 real HTTP contract groups. Read result loss injected after GET, lease expiry simulated, fresh subprocess recovers matching receipt. Selected business counts and balances unchanged; no business POST.
-No production IAM, actual write dispatch, actual submit response loss, target database migration or production acceptance tested.
+v0.9.6 verified CI results (2026-11-26)
+Agent 69695dc564ad3fb2ca1b012ee74f70fb3e18052a: run 45765456480, 325 passed, 1 warning in 49.69s; 8 new tests including 1 PostgreSQL concurrent manual review (8 PostgreSQL integration cases total).
+Stone 5b7917e3f050551de1054d44308844b58d8ab333: run 45765488016, MySQL 5.7/8.0 each 45 tests, 0 failures/errors/skipped; eight real HTTP contract groups passed per matrix. Actual 401 then corrected read credential, explicit one-shot manual review, matching receipt and idempotent audit; selected database counts and balances unchanged, business POST=0.
+No production IAM, actual dispatch, actual write-response loss, target populated database migration or production acceptance tested. Local operator only. Final documentation commit CI tracked separately.
