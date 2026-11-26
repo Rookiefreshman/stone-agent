@@ -250,6 +250,19 @@
 - [ ] 真实模型端点配置、独立重复实测、真实用户语料评审、指标门槛业务方确认、基于实际错误分布优化。当前未提供实际模型端点及凭据，不宣称完成。
 - [ ] 生产写入专项、企业身份、实际部署及业务验收依旧独立待办；本轮无 Stone 代码、工具、运行时业务逻辑或数据库 schema 变化。
 
+## v0.9.9 多轮会话语义评测与上下文安全回归
+- [x] 复核 v0.9.8 最新 CI：Agent 357 passed，核心评测基线正常；识别 Python TestClient 的上游 AnyIO 弃用警告。
+- [x] 新增 14 个真实业务流程形态的合成会话场景、30 个用户回合：确认后继承、缺参澄清、未确认不继承、同业务类型追问、跨类型隔离、跨 Session 隔离、权限撤销、待澄清过期、活跃 Run 阻止并发新提议。
+- [x] 新增 agent.eval_sessions，直接调用现有 SessionService；确认后仅使用本地 SQLite + FixtureStoneService 完成合成 Run；评测不访问 Stone HTTP、不执行真实业务写入。
+- [x] 模型模式复用 ChatCompatibleProvider；只对未被受限规则处理的自然语言轮次请求模型；模型候选与平台最终结果分开记录；错误/不匹配时中止场景，不确认错误目标。
+- [x] 统计 turn/scenario exact、错误确认、澄清与上下文隔离、真实模型请求与 Token 覆盖、P50/P95、重复稳定性；从持久 invocation ledger 统计 Fixture 调用，避免漏计历史回执步骤。
+- [x] CI Actions 更新至 checkout@v6 / setup-python@v6 / upload-artifact@v6（Node 24），并上传多轮会话 fixture 基线；Node 20 弃用警告已消除。
+- [ ] v0.9.9 最终 HEAD 全量 CI 验收（当前运行 45770395968）。
+- [ ] Python TestClient DeprecationWarning：当前 FastAPI 0.128.2 将 Starlette 限制为 <0.51，Starlette 0.50.0 调用 AnyIO 4.15 已弃用别名；上游修复位于 Starlette 1.x，需单独进行 FastAPI/Starlette/httpx2 兼容升级与完整 HTTP 契约回归，不通过屏蔽 warning 或降级 AnyIO 掩盖。
+- [ ] 真实模型端点、真实多轮 LLM 评测及失败样例归因；当前未配置模型服务，不把 Fixture 结果称为 LLM 准确率。
+- [ ] 仓储业务人员审核会话黄金集，确认澄清策略、同类型继承与撤权行为是否符合实际岗位工作流。
+- [ ] 生产身份、企业授权、真实审批、可信发送账本、真实写入仍为独立专项；本轮没有 Stone 业务代码、API 或数据库 schema 变化。
+
 ## v1.0 业务交付与生产验收（计划）
 - [ ] 面向仓库/运维岗位的工作台：会话、查询、证据、运行记录、审批（按需）
 - [ ] 真实业务任务完成率、延迟、成本、权限与无依据结论率验收
