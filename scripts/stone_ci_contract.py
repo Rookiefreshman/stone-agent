@@ -103,6 +103,23 @@ def verify(receipt_task, operation_id, history_task, query_token, receipt_token)
         require([x["state"] for x in history]==["ABANDONED","OBSERVED"],"RECEIPT_ATTEMPT_AUDIT")
     checks.append("durable_receipt_recovery_after_read_result_loss")
 
+    # Actual server denies the first read. A local operator fixes the read
+    # credential and explicitly authorizes one more GET, not a cancellation.
+    with tempfile.TemporaryDirectory() as folder:
+        store=Store(str(Path(folder)/"manual-review.sqlite"))
+        operator=Principal("test",OPERATOR,frozenset({99101}))
+        denied=ReceiptCheckService(store,operator,ORIGIN,"invalid-ci-receipt-token-123456","stone-disposable-ci",enabled=True)
+        cid=denied.register(key)["check_id"]
+        first=denied.once()
+        require(first["manual_review"] and first["last_code"]=="RECEIPT_HTTP_401","MANUAL_REVIEW_HOLD")
+        journal=ReceiptCheckService(store,operator,ORIGIN,receipt_token,"stone-disposable-ci",enabled=True)
+        require(journal.pending_reviews()["items"][0]["check_id"]==cid,"MANUAL_REVIEW_DISCOVERY")
+        retry=journal.manual_retry(cid,request_id="ci-credential-fixed",expected_fence=first["fence"],reason="Restore test read credential")
+        require(retry["state"]=="RECEIPT_MATCHED" and retry["manual_attempts"]==1 and not retry["write_allowed"],"MANUAL_REVIEW_RECOVERY")
+        require(journal.manual_retry(cid,request_id="ci-credential-fixed",expected_fence=first["fence"],reason="Restore test read credential")["replayed"],"MANUAL_REVIEW_REPLAY")
+        require(journal.pending_reviews()["items"]==[] and len(journal.view(cid)["review_history"])==1,"MANUAL_REVIEW_AUDIT")
+    checks.append("manual_receipt_review_after_real_permission_denial")
+
     # Local data-domain denial, and independent server-side receipt reader scope.
     try:
         reader.query(Principal("test", "denied", frozenset()), key)
