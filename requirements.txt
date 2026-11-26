@@ -1,0 +1,9 @@
+pydantic>=2.7,<3
+# HTTP stack: validated together; TestClient needs an explicit HTTP client.
+fastapi==0.128.2
+starlette==0.50.0
+httpx==0.28.1
+uvicorn>=0.30,<1
+pytest>=8,<10
+psycopg[binary]>=3.2,<4
+alembic>=1.13,<2
