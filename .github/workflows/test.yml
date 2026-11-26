@@ -35,3 +35,11 @@ jobs:
         env:
           TEST_POSTGRES_DSN: postgresql://agent_test:ci_only_password@127.0.0.1:5432/agent_test
         run: python -m pytest -q -rs
+      - name: Publish synthetic semantic baseline (not a live model score)
+        run: |
+          python -m agent.eval_goals --mode fixture --fail-on-critical > semantic-baseline.json
+          python -c "import json; print(json.dumps(json.load(open('semantic-baseline.json'))['metrics'], ensure_ascii=False))"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: semantic-fixture-baseline
+          path: semantic-baseline.json
