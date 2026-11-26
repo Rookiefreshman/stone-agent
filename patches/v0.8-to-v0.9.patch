@@ -1,0 +1,79 @@
+--- a/agent/api.py
++++ b/agent/api.py
+@@ -11,6 +11,7 @@
+ from .main import build
+ from .goal_proposal import propose
+ from .session import SessionService
++from .operations import OperationService, DraftRequest, ReviewRequest
+ from fastapi import Query
+ 
+ class Submit(BaseModel):
+@@ -37,7 +38,15 @@ def create_app():
+     if not token or len(token)<16: raise RuntimeError('set POC_DEV_TOKEN (at least 16 characters); local development only')
+     runtime=build(os.getenv('POC_DB','demo.sqlite'),os.getenv('POC_LIVE_MODEL')=='1')
+     sessions=SessionService(runtime.store,runtime.provider if os.getenv('POC_LIVE_MODEL')=='1' else None)
+-    app=FastAPI(title='Stone Agent v0.8 — local development')
++    app=FastAPI(title='Stone Agent v0.9 — local development')
++    review_token=os.getenv('POC_REVIEW_TOKEN','')
++    rehearsal=os.getenv('POC_REHEARSAL_ENABLED')=='1'
++    if rehearsal and (len(review_token)<16 or hmac.compare_digest(review_token,token) or os.getenv('STONE_LIVE_DOMAIN')=='1'):
++        raise RuntimeError('rehearsal requires distinct reviewer token and fixture domain')
++    operations=OperationService(runtime.store,runtime.registry,rehearsal_enabled=rehearsal)
++    def reviewer(auth):
++        if not rehearsal or not auth or not hmac.compare_digest(auth,'Bearer '+review_token): raise HTTPException(403,'Rehearsal reviewer required')
++        return Principal('demo','local-reviewer',frozenset(int(x) for x in os.getenv('POC_REVIEW_WAREHOUSES','').split(',') if x))
+     def principal(auth):
+         if not auth or not hmac.compare_digest(auth,'Bearer '+token): raise HTTPException(401,'Unauthorized')
+         return Principal('demo','local-dev',frozenset(int(x) for x in os.getenv('STONE_ALLOWED_WAREHOUSES','1').split(',')))
+@@ -109,4 +118,22 @@ def create_app():
+         p=principal(authorization)
+         def op(): runtime.store.cancel(p,run_id); return runtime.view(p,run_id)
+         return guard(op)
++    @app.get('/api/v1/operations/preflight/{run_id}')
++    def preflight(run_id:str,warehouse_id:int=Query(...,ge=1,le=9223372036854775807),task_id:int=Query(...,ge=1,le=9223372036854775807),authorization:str|None=Header(None)):
++        return guard(lambda:operations.preflight(principal(authorization),run_id,StockWorkArgs(warehouse_id=warehouse_id,task_id=task_id)))
++    @app.post('/api/v1/operations/cancel-drafts',status_code=201)
++    def draft(req:DraftRequest,authorization:str|None=Header(None)):
++        return guard(lambda:operations.create(principal(authorization),req))
++    @app.get('/api/v1/operations/{operation_id}')
++    def operation(operation_id:str,authorization:str|None=Header(None)):
++        return guard(lambda:operations.get(principal(authorization),operation_id))
++    @app.get('/api/v1/rehearsal/reviews/{operation_id}')
++    def review_view(operation_id:str,authorization:str|None=Header(None)):
++        return guard(lambda:operations.get(reviewer(authorization),operation_id,reviewer=True))
++    @app.post('/api/v1/rehearsal/reviews/{operation_id}')
++    def review(operation_id:str,req:ReviewRequest,authorization:str|None=Header(None)):
++        return guard(lambda:operations.review(reviewer(authorization),operation_id,req))
++    @app.post('/api/v1/operations/{operation_id}/withdraw')
++    def withdraw(operation_id:str,authorization:str|None=Header(None)):
++        return guard(lambda:operations.withdraw(principal(authorization),operation_id))
+     return app
+--- a/agent/store.py
++++ b/agent/store.py
+@@ -1,6 +1,7 @@
+ import sqlite3, time, uuid
+ from contextlib import contextmanager
+ from .contracts import canonical, digest, strict_json, Conflict, LostClaim, Forbidden
++from .operations import OP_DDL
+ 
+ DDL='''
+ CREATE TABLE IF NOT EXISTS agent_session (
+@@ -77,6 +78,7 @@
+                     OR (origin='RULE' AND request_id IS NULL AND provider_call_id IS NULL AND direct_snapshot IS NOT NULL)))""")
+                 c.execute("INSERT INTO invocation SELECT *, 'MODEL', NULL FROM invocation_v05")
+                 c.execute('DROP TABLE invocation_v05')
++            for stmt in OP_DDL: c.execute(stmt)
+     @contextmanager
+     def tx(self):
+         c=sqlite3.connect(self.path,timeout=5,isolation_level=None); c.row_factory=sqlite3.Row
+--- a/agent/postgres.py
++++ b/agent/postgres.py
+@@ -29,7 +29,7 @@
+         self.driver=psycopg; self.dsn=dsn
+         with self.tx() as c:
+             row=c.execute('SELECT version_num FROM alembic_version').fetchone()
+-            if not row or row[0]!='0003_rule_calls': raise RuntimeError('run Alembic upgrade head before starting')
++            if not row or row[0]!='0004_cancel_drafts': raise RuntimeError('run Alembic upgrade head before starting')
+     @contextmanager
+     def tx(self):
+         with self.driver.connect(self.dsn,connect_timeout=5) as conn:

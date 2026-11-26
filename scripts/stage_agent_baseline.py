@@ -4,7 +4,7 @@ No automatic commits, network requests, force updates, deletes or pushes.
 from pathlib import Path
 import argparse, shutil, subprocess
 
-BRANCH='agent/wes-diagnostics-v0.8'
+BRANCH='agent/cancel-rehearsal-v0.9'
 REMOTES={'https://github.com/Rookiefreshman/stone-agent.git','https://github.com/Rookiefreshman/stone-agent','git@github.com:Rookiefreshman/stone-agent.git','ssh://git@github.com/Rookiefreshman/stone-agent.git'}
 ROOT=Path(__file__).resolve().parents[1]
 TOP={'README.md','requirements.txt','alembic.ini','.gitignore','TEST_RESULTS.txt'}
