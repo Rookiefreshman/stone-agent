@@ -7,9 +7,10 @@ import os
 from pathlib import Path
 import time
 
-from .contracts import Principal, Forbidden, digest, strict_json
+from .contracts import Principal, Forbidden, ModelAttemptError, digest, strict_json
 from .goal_proposal import Candidate, ALIAS, propose, fixture_candidate
-from .provider import ChatCompatibleProvider
+from .provider import ChatCompatibleProvider, safe_error_code
+from .eval_diagnostics import diagnose, diagnostic_counts, provider_error_counts
 
 DEFAULT_GOLD=Path(__file__).resolve().parents[1]/"evals"/"business_goals_v1.json"
 MAX_CALLS=200
@@ -47,10 +48,15 @@ class Capture:
         self.model=provider.model
         self.turn=None
         self.calls=0
+        self.error_code=None
     def generate(self,body):
         self.calls+=1
         if self.calls!=1: raise RuntimeError("unexpected model retry")
-        self.turn=self.provider.generate(body)
+        try:
+            self.turn=self.provider.generate(body)
+        except ModelAttemptError as exc:
+            self.error_code=safe_error_code(exc)
+            raise
         return self.turn
 
 def raw_candidate(turn):
@@ -99,6 +105,8 @@ def summarize(rows):
       "reported_token_sum":sum(tokens) if tokens else None,
       "reported_token_coverage":rate(len(tokens),total),
       "model_requests":sum(r["model_requests"] for r in rows),
+      "diagnostic_counts":diagnostic_counts(rows),
+      "provider_error_counts":provider_error_counts(rows),
       "actual_status_counts":dict(Counter(r["actual"]["status"] for r in rows)),
     }
 
@@ -124,7 +132,9 @@ def evaluate(data,provider=None,repeats=1):
             if type(tokens) is not int or tokens<0: tokens=None
             exp=case["expected"]
             raw_entity={k:v for k,v in raw.items() if k!="kind"} if raw is not None else None
-            rows.append({"id":case["id"],"category":case["category"],"repeat":repeat,"expected":exp,"actual":actual,"raw":raw,
+            error_code=capture.error_code if capture else None
+            diagnosis=diagnose(exp,actual,raw,capture.turn if capture else None,error_code,capture.calls if capture else 0,actual==exp,fixture=capture is None)
+            rows.append({"provider_error_code":error_code,"diagnosis":diagnosis,"id":case["id"],"category":case["category"],"repeat":repeat,"expected":exp,"actual":actual,"raw":raw,
                 "exact":actual==exp,
                 "goal_match":actual["kind"]==exp["kind"],
                 "entity_match":actual["candidate"]==exp["candidate"],

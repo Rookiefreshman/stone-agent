@@ -14,7 +14,8 @@ from .contracts import (
     digest, strict_json,
 )
 from .goal_proposal import ALIAS, Candidate
-from .provider import ChatCompatibleProvider, FixtureProvider
+from .provider import ChatCompatibleProvider, FixtureProvider, safe_error_code
+from .eval_diagnostics import diagnose, diagnostic_counts, provider_error_counts
 from .runtime import Runtime
 from .session import SessionService
 from .store import RULES, Store
@@ -32,9 +33,15 @@ class CountingProvider:
         self.revision=provider.revision
         self.requests=0
         self.turns=[]
+        self.error_code=None
     def generate(self,body):
         self.requests+=1
-        turn=self.provider.generate(body)
+        self.error_code=None
+        try:
+            turn=self.provider.generate(body)
+        except ModelAttemptError as exc:
+            self.error_code=safe_error_code(exc)
+            raise
         self.turns.append(turn)
         return turn
 
@@ -207,7 +214,10 @@ def evaluate(data,provider=None,repeats=1):
                             failed=True
                     elif not exact:
                         failed=True
-                    row={"scenario_id":scenario["id"],"category":scenario["category"],"step_id":step["id"],"repeat":repeat,
+                    requests=capture.requests-request_before if capture else 0
+                    error_code=capture.error_code if requests else None
+                    diagnosis=diagnose(expected,actual,raw,new_turns[0] if len(new_turns)==1 else None,error_code,requests,exact,execution_ok,fixture=provider is None)
+                    row={"provider_error_code":error_code,"diagnosis":diagnosis,"scenario_id":scenario["id"],"category":scenario["category"],"step_id":step["id"],"repeat":repeat,
                         "message":message,"expected":expected,"actual":actual,"source":result.get("source") if result else None,
                         "raw":raw,"raw_schema_valid":raw is not None,"exact":exact,"execution_ok":execution_ok,
                         "confirmation_created":confirmation is not None and "run_id" in confirmation,
@@ -248,6 +258,7 @@ def evaluate(data,provider=None,repeats=1):
         "fixture_service_invocations":sum(r.get("fixture_invocations",0) for r in executed),
         "local_rule_invocations":sum(r.get("rule_invocations",0) for r in executed),
         "runtime_model_calls":sum(r.get("runtime_model_calls_delta",0) for r in executed),
+        "diagnostic_counts":diagnostic_counts(rows),"provider_error_counts":provider_error_counts(executed),
         "model_requests":capture.requests if capture else 0,"raw_schema_valid_count":sum(r.get("raw_schema_valid",False) for r in executed),
         "raw_confirmable_exact_rate":ratio(raw_exact,len(model_positive)),
         "reported_token_sum":sum(tokens) if tokens else None,"reported_token_coverage":ratio(len(tokens),capture.requests if capture else 0),

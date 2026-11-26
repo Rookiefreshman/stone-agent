@@ -1,4 +1,4 @@
-# Stone Agent v0.9.9
+# Stone Agent v0.9.10
 
 完整 Python Runtime、Session、Worker、Registry、HTTP/LOCAL 诊断、SQLite/PostgreSQL、Alembic 和 CI。v0.9.2 新增仅合成数据的持久化故障演练：一次性模拟审批消费、持久模拟发送意图、租约/fencing、迟到回执和有界对账。无真实写 dispatcher 或生产审批授权。
 
@@ -25,3 +25,5 @@ Stone Java 8 / MySQL 5.7 与 8.0 各38项 Maven 测试及6组真实 HTTP 契约�
 - v0.9.8：[独立业务语义评测](docs/SEMANTIC_EVALUATION_V098.md)：44条人工合成黄金样例，`python -m agent.eval_goals --mode fixture`；真实模型模式显式配置后执行，未进行外部真实模型评测。无业务执行或 schema 变化。[CI](https://github.com/Rookiefreshman/stone-agent/actions/runs/45767119437)。
 
 - v0.9.9：[多轮会话评测](docs/MULTITURN_SESSION_EVALUATION_V099.md)：`python -m agent.eval_sessions --mode fixture --fail-on-critical`。使用本地 SQLite 与 FixtureStoneService，不访问真实 Stone，不产生业务写入。
+
+- v0.9.10：[模型 HTTP 协议与评测失败分类](docs/MODEL_HTTP_CONTRACT_V0910.md)；复用既有目标及执行策略，增加隔离 HTTP 合同测试与评测归因。真实模型未验收。
